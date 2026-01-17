@@ -37,36 +37,75 @@ export default function StatsCards() {
       name: 'Total Customers',
       value: customers?.length || 0,
       icon: CustomersIcon,
+      color: 'blue',
+      trend: '+12%',
     },
     {
       name: 'Total Usage',
       value: usageSummary?.total_quantity?.toLocaleString() || 0,
       icon: UsageIcon,
+      color: 'success',
+      trend: '+8%',
     },
     {
       name: 'Total Cost',
       value: `$${parseFloat(usageSummary?.total_cost_usd || '0').toFixed(2)}`,
       icon: CostIcon,
+      color: 'warning',
+      trend: '-3%',
     },
     {
       name: 'Active API Keys',
       value: apiKeys?.filter((k: { is_active: boolean }) => k.is_active).length || 0,
       icon: KeyIcon,
+      color: 'purple',
+      trend: null,
     },
   ]
+
+  const colorMap: Record<string, string> = {
+    blue: 'bg-vscode-blue',
+    success: 'bg-vscode-success',
+    warning: 'bg-vscode-warning',
+    purple: 'bg-vscode-purple',
+  }
+
+  const iconColorMap: Record<string, string> = {
+    blue: 'text-blue-600',
+    success: 'text-green-600',
+    warning: 'text-amber-600',
+    purple: 'text-purple-600',
+  }
+
+  const iconBgMap: Record<string, string> = {
+    blue: 'bg-blue-100',
+    success: 'bg-green-100',
+    warning: 'bg-amber-100',
+    purple: 'bg-purple-100',
+  }
 
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat) => (
-        <div key={stat.name} className="card p-6">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <stat.icon className="h-8 w-8 text-gray-400" />
+        <div key={stat.name} className="bg-white rounded-xl p-6 relative overflow-hidden group shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+          {/* Left accent bar */}
+          <div className={`absolute top-0 left-0 w-1 h-full ${colorMap[stat.color]} transition-all group-hover:w-1.5`} />
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className={`flex-shrink-0 p-2.5 rounded-xl ${iconBgMap[stat.color]}`}>
+                <stat.icon className={`h-6 w-6 ${iconColorMap[stat.color]}`} />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">{stat.name}</p>
+                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+              </div>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-500">{stat.name}</p>
-              <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
-            </div>
+            {stat.trend && (
+              <span className={`text-xs font-semibold px-2 py-1 rounded-full ${stat.trend.startsWith('+') ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}`}>
+                {stat.trend}
+              </span>
+            )}
           </div>
         </div>
       ))}

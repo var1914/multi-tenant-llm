@@ -21,6 +21,12 @@ export interface Customer {
   name: string | null
   email: string | null
   metadata: Record<string, unknown>
+  budget_limit_usd: string | null
+  budget_alert_threshold: string | null
+  budget_alert_enabled: boolean | null
+  budget_block_on_limit: boolean | null
+  workflow_budget_usd: string | null
+  workflow_budget_action: string | null
   created_at: string
 }
 

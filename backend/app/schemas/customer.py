@@ -13,6 +13,10 @@ class CustomerCreate(BaseModel):
     budget_limit_usd: Optional[Decimal] = None
     budget_alert_threshold: Optional[Decimal] = 80
     budget_alert_enabled: Optional[bool] = True
+    budget_block_on_limit: Optional[bool] = False
+    # Workflow budget settings (for agentic AI cost guards)
+    workflow_budget_usd: Optional[Decimal] = None
+    workflow_budget_action: Optional[str] = 'alert'
 
 
 class CustomerUpdate(BaseModel):
@@ -22,6 +26,10 @@ class CustomerUpdate(BaseModel):
     budget_limit_usd: Optional[Decimal] = None
     budget_alert_threshold: Optional[Decimal] = None
     budget_alert_enabled: Optional[bool] = None
+    budget_block_on_limit: Optional[bool] = None
+    # Workflow budget settings
+    workflow_budget_usd: Optional[Decimal] = None
+    workflow_budget_action: Optional[str] = None
 
 
 class CustomerResponse(BaseModel):
@@ -33,6 +41,9 @@ class CustomerResponse(BaseModel):
     budget_limit_usd: Optional[Decimal]
     budget_alert_threshold: Optional[Decimal]
     budget_alert_enabled: Optional[bool]
+    budget_block_on_limit: Optional[bool]
+    workflow_budget_usd: Optional[Decimal]
+    workflow_budget_action: Optional[str]
     created_at: datetime
 
     class Config:
@@ -47,7 +58,9 @@ class CustomerBudgetStatus(BaseModel):
     customer_id: str
     customer_name: Optional[str]
     budget_limit_usd: Optional[Decimal]
+    budget_block_on_limit: Optional[bool]
     current_spend_usd: Decimal
     percentage_used: float
     is_over_budget: bool
     is_near_threshold: bool
+    is_blocked: bool  # True if requests should be blocked

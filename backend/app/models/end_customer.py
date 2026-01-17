@@ -21,8 +21,18 @@ class EndCustomer(Base, UUIDMixin, TimestampMixin):
     budget_limit_usd = Column(Numeric(12, 6), nullable=True)  # Monthly budget limit
     budget_alert_threshold = Column(Numeric(5, 2), default=80)  # Alert at 80% by default
     budget_alert_enabled = Column(Boolean, default=True)
+    budget_block_on_limit = Column(Boolean, default=False)  # Block requests when limit exceeded
+
+    # Workflow budget settings (for agentic AI cost guards)
+    workflow_budget_usd = Column(Numeric(12, 6), nullable=True)  # Per-workflow budget limit
+    workflow_budget_action = Column(String(50), default='alert')  # 'alert' or 'pause'
+
+    # Prediction settings
+    prediction_enabled = Column(Boolean, default=True)
 
     # Relationships
     tenant = relationship("Tenant", back_populates="end_customers")
     usage_events = relationship("UsageEvent", back_populates="end_customer", cascade="all, delete-orphan")
     routing_decisions = relationship("RoutingDecision", back_populates="end_customer")
+    prediction_alerts = relationship("PredictionAlert", back_populates="end_customer", cascade="all, delete-orphan")
+    agent_workflows = relationship("AgentWorkflow", back_populates="end_customer", cascade="all, delete-orphan")

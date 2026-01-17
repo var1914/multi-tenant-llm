@@ -45,7 +45,11 @@ interface FeatureUsage {
   event_count: number
 }
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
+// Soft, muted color palette for charts
+const COLORS = ['#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd', '#818cf8', '#a5b4fc', '#c7d2fe']
+const SOFT_BLUE = '#6366f1'
+const SOFT_INDIGO = '#818cf8'
+const SOFT_VIOLET = '#a78bfa'
 
 export default function Analytics() {
   const { data: byModel, isLoading: loadingModels } = useQuery<ModelUsage[]>({
@@ -126,8 +130,8 @@ export default function Analytics() {
       </div>
 
       {/* Daily Usage Trend */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold mb-4">Daily Usage Trend</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Daily Usage Trend</h2>
         {loadingDaily ? (
           <div className="h-64 flex items-center justify-center text-gray-500">Loading...</div>
         ) : dailyChartData && dailyChartData.length > 0 ? (
@@ -136,25 +140,27 @@ export default function Analytics() {
               <AreaChart data={dailyChartData}>
                 <defs>
                   <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="5%" stopColor={SOFT_BLUE} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={SOFT_BLUE} stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} />
-                <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(v) => `$${v}`} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(v) => `$${v}`} tickLine={false} axisLine={false} />
                 <Tooltip
                   formatter={(value: number) => [`$${value.toFixed(2)}`, 'Cost']}
                   contentStyle={{
                     backgroundColor: '#fff',
                     border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                   }}
                 />
                 <Area
                   type="monotone"
                   dataKey="cost"
-                  stroke="#3b82f6"
+                  stroke={SOFT_BLUE}
+                  strokeWidth={2}
                   fillOpacity={1}
                   fill="url(#colorCost)"
                 />
@@ -170,26 +176,33 @@ export default function Analytics() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Cost by Model */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold mb-4">Cost by Model</h2>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Cost by Model</h2>
           {loadingModels ? (
             <div className="h-64 flex items-center justify-center text-gray-500">Loading...</div>
           ) : modelChartData && modelChartData.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={modelChartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis type="number" tickFormatter={(v) => `$${v}`} stroke="#9ca3af" fontSize={12} />
-                  <YAxis dataKey="name" type="category" width={120} stroke="#9ca3af" fontSize={11} />
+                  <defs>
+                    <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={SOFT_BLUE} stopOpacity={0.8} />
+                      <stop offset="100%" stopColor={SOFT_INDIGO} stopOpacity={0.9} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                  <XAxis type="number" tickFormatter={(v) => `$${v}`} stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis dataKey="name" type="category" width={120} stroke="#6b7280" fontSize={11} tickLine={false} axisLine={false} />
                   <Tooltip
                     formatter={(value: number) => [`$${value.toFixed(2)}`, 'Cost']}
                     contentStyle={{
                       backgroundColor: '#fff',
                       border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                     }}
                   />
-                  <Bar dataKey="cost" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="cost" fill="url(#barGradient)" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -201,8 +214,8 @@ export default function Analytics() {
         </div>
 
         {/* Cost by Provider (Pie) */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold mb-4">Cost by Provider</h2>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Cost by Provider</h2>
           {loadingModels ? (
             <div className="h-64 flex items-center justify-center text-gray-500">Loading...</div>
           ) : providerData && providerData.length > 0 ? (
@@ -213,17 +226,26 @@ export default function Analytics() {
                     data={providerData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
+                    innerRadius={70}
+                    outerRadius={90}
+                    paddingAngle={3}
                     dataKey="value"
                     label={({ name, value }) => `${name}: $${value.toFixed(2)}`}
+                    labelLine={{ stroke: '#d1d5db', strokeWidth: 1 }}
                   >
                     {providerData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
+                  <Tooltip
+                    formatter={(value: number) => `$${value.toFixed(2)}`}
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -236,8 +258,8 @@ export default function Analytics() {
       </div>
 
       {/* Cost by Feature */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold mb-4">Cost by Feature</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Cost by Feature</h2>
         <p className="text-sm text-gray-500 mb-4">See which AI features drive the most usage</p>
         {loadingFeatures ? (
           <div className="h-64 flex items-center justify-center text-gray-500">Loading...</div>
@@ -245,9 +267,15 @@ export default function Analytics() {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={featureChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={11} />
-                <YAxis tickFormatter={(v) => `$${v}`} stroke="#9ca3af" fontSize={12} />
+                <defs>
+                  <linearGradient id="featureGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={SOFT_VIOLET} stopOpacity={0.9} />
+                    <stop offset="100%" stopColor={SOFT_BLUE} stopOpacity={0.7} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="name" stroke="#6b7280" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={(v) => `$${v}`} stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
                 <Tooltip
                   formatter={(value: number, name: string) => [
                     name === 'cost' ? `$${value.toFixed(2)}` : value,
@@ -256,10 +284,11 @@ export default function Analytics() {
                   contentStyle={{
                     backgroundColor: '#fff',
                     border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                   }}
                 />
-                <Bar dataKey="cost" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="cost" fill="url(#featureGradient)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -271,26 +300,33 @@ export default function Analytics() {
       </div>
 
       {/* Cost by Customer */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold mb-4">Cost by Customer</h2>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Cost by Customer</h2>
         {loadingCustomers ? (
           <div className="h-64 flex items-center justify-center text-gray-500">Loading...</div>
         ) : customerChartData && customerChartData.length > 0 ? (
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={customerChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={11} />
-                <YAxis tickFormatter={(v) => `$${v}`} stroke="#9ca3af" fontSize={12} />
+                <defs>
+                  <linearGradient id="customerGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34d399" stopOpacity={0.9} />
+                    <stop offset="100%" stopColor="#6ee7b7" stopOpacity={0.7} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="name" stroke="#6b7280" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={(v) => `$${v}`} stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
                 <Tooltip
                   formatter={(value: number) => [`$${value.toFixed(2)}`, 'Cost']}
                   contentStyle={{
                     backgroundColor: '#fff',
                     border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                   }}
                 />
-                <Bar dataKey="cost" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="cost" fill="url(#customerGradient)" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

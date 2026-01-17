@@ -1,14 +1,20 @@
 import { Link, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: DashboardIcon },
-  { name: 'Analytics', href: '/analytics', icon: AnalyticsIcon },
-  { name: 'Smart Routing', href: '/smart-routing', icon: RoutingIcon },
-  { name: 'Customers', href: '/customers', icon: CustomersIcon },
-  { name: 'API Keys', href: '/api-keys', icon: KeyIcon },
-  { name: 'Billing', href: '/billing', icon: BillingIcon },
-  { name: 'Settings', href: '/settings', icon: SettingsIcon },
+const mainNavigation = [
+  { name: 'Dashboard', href: '/app/dashboard', icon: DashboardIcon },
+  { name: 'Analytics', href: '/app/analytics', icon: AnalyticsIcon },
+  { name: 'Smart Routing', href: '/app/smart-routing', icon: RoutingIcon },
+  { name: 'Predictions', href: '/app/predictions', icon: PredictionsIcon },
+  { name: 'Workflows', href: '/app/workflows', icon: WorkflowsIcon },
+  { name: 'Agent Efficiency', href: '/app/agent-efficiency', icon: EfficiencyIcon },
+]
+
+const manageNavigation = [
+  { name: 'Customers', href: '/app/customers', icon: CustomersIcon },
+  { name: 'API Keys', href: '/app/api-keys', icon: KeyIcon },
+  { name: 'Billing', href: '/app/billing', icon: BillingIcon },
+  { name: 'Settings', href: '/app/settings', icon: SettingsIcon },
 ]
 
 function DashboardIcon({ className }: { className?: string }) {
@@ -68,37 +74,121 @@ function RoutingIcon({ className }: { className?: string }) {
   )
 }
 
+function PredictionsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+    </svg>
+  )
+}
+
+function WorkflowsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75v10.5M15 12v5.25" />
+    </svg>
+  )
+}
+
+function EfficiencyIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+    </svg>
+  )
+}
+
+// Navigation item component
+function NavItem({ item, isActive }: { item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }; isActive: boolean }) {
+  return (
+    <li>
+      <Link
+        to={item.href}
+        className={clsx(
+          'group flex items-center gap-x-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200',
+          isActive
+            ? 'bg-vscode-bgActive text-vscode-text border-l-2 border-vscode-blue'
+            : 'text-vscode-textSecondary hover:bg-vscode-bgHover hover:text-vscode-text border-l-2 border-transparent'
+        )}
+      >
+        <item.icon className={clsx(
+          'h-5 w-5 shrink-0 transition-colors',
+          isActive ? 'text-vscode-blue' : 'text-vscode-textSecondary group-hover:text-vscode-text'
+        )} />
+        {item.name}
+        {isActive && (
+          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-vscode-blue animate-pulse" />
+        )}
+      </Link>
+    </li>
+  )
+}
+
 export default function Sidebar() {
   const location = useLocation()
 
   return (
-    <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:overflow-y-auto lg:bg-gray-900 lg:pb-4">
-      <div className="flex h-16 shrink-0 items-center px-6">
-        <span className="text-xl font-bold text-white">UsageFlow</span>
+    <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:overflow-y-auto lg:bg-vscode-bgSidebar lg:border-r lg:border-vscode-border lg:pb-4">
+      {/* Logo Section */}
+      <div className="flex h-16 shrink-0 items-center px-6 border-b border-vscode-border">
+        <div className="flex items-center gap-3">
+          <svg viewBox="0 0 40 40" className="w-8 h-8" fill="none">
+            <path
+              d="M8 32C8 32 12 28 16 24C20 20 24 16 28 12C32 8 36 8 36 8"
+              stroke="url(#sidebar-trail-gradient)"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            <circle cx="10" cy="30" r="4" fill="#22c55e" />
+            <circle cx="20" cy="20" r="3.5" fill="#eab308" />
+            <circle cx="30" cy="10" r="3" fill="#ef4444" />
+            <defs>
+              <linearGradient id="sidebar-trail-gradient" x1="8" y1="32" x2="36" y2="8">
+                <stop offset="0%" stopColor="#22c55e" />
+                <stop offset="50%" stopColor="#eab308" />
+                <stop offset="100%" stopColor="#ef4444" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span className="text-lg font-semibold text-vscode-text">TokenTrail</span>
+        </div>
       </div>
-      <nav className="mt-6 px-3">
+
+      {/* Navigation */}
+      <nav className="mt-4 px-3">
+        {/* Main section */}
+        <div className="px-3 mb-2">
+          <span className="text-xs font-medium text-vscode-textMuted uppercase tracking-wider">
+            Overview
+          </span>
+        </div>
         <ul role="list" className="space-y-1">
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.href
-            return (
-              <li key={item.name}>
-                <Link
-                  to={item.href}
-                  className={clsx(
-                    'flex items-center gap-x-3 rounded-md px-3 py-2 text-sm font-medium',
-                    isActive
-                      ? 'bg-gray-800 text-white'
-                      : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                  )}
-                >
-                  <item.icon className="h-5 w-5 shrink-0" />
-                  {item.name}
-                </Link>
-              </li>
-            )
-          })}
+          {mainNavigation.map((item) => (
+            <NavItem key={item.name} item={item} isActive={location.pathname === item.href} />
+          ))}
+        </ul>
+
+        {/* Manage section */}
+        <div className="px-3 mt-6 mb-2">
+          <span className="text-xs font-medium text-vscode-textMuted uppercase tracking-wider">
+            Manage
+          </span>
+        </div>
+        <ul role="list" className="space-y-1">
+          {manageNavigation.map((item) => (
+            <NavItem key={item.name} item={item} isActive={location.pathname === item.href} />
+          ))}
         </ul>
       </nav>
+
+      {/* Bottom status */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-vscode-border bg-vscode-bgSidebar">
+        <div className="flex items-center gap-3 px-3">
+          <span className="w-2 h-2 rounded-full bg-vscode-success animate-pulse" />
+          <span className="text-xs text-vscode-textSecondary">System Online</span>
+        </div>
+      </div>
     </div>
   )
 }

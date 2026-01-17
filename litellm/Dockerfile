@@ -5,8 +5,8 @@ WORKDIR /app
 # Copy configuration
 COPY config.yaml /app/config.yaml
 
-# Copy custom callback for UsageFlow tracking
-COPY usageflow_callback.py /app/usageflow_callback.py
+# Copy custom callback for TokenTrail tracking
+COPY tokentrail_callback.py /app/tokentrail_callback.py
 
 # Install httpx for async HTTP calls in callback
 RUN pip install httpx

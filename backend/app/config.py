@@ -4,14 +4,14 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "UsageFlow"
+    APP_NAME: str = "TokenTrail"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     FRONTEND_URL: str = "http://localhost:3000"
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://usageflow:usageflow_dev@localhost:5432/usageflow"
-    SYNC_DATABASE_URL: str = "postgresql://usageflow:usageflow_dev@localhost:5432/usageflow"
+    DATABASE_URL: str = "postgresql+asyncpg://tokentrail:tokentrail_dev@localhost:5432/tokentrail"
+    SYNC_DATABASE_URL: str = "postgresql://tokentrail:tokentrail_dev@localhost:5432/tokentrail"
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -26,11 +26,11 @@ class Settings(BaseSettings):
     LITELLM_PROXY_URL: str = "http://localhost:4000"
 
     # Internal API Key for service-to-service communication (LiteLLM callback)
-    USAGEFLOW_INTERNAL_API_KEY: str = "internal-api-key"
+    TOKENTRAIL_INTERNAL_API_KEY: str = "internal-api-key"
 
     # API Key Settings
-    API_KEY_PREFIX_LIVE: str = "uf_live_"
-    API_KEY_PREFIX_TEST: str = "uf_test_"
+    API_KEY_PREFIX_LIVE: str = "tt_live_"
+    API_KEY_PREFIX_TEST: str = "tt_test_"
 
     # Stripe (use test keys for local development)
     STRIPE_SECRET_KEY: str = ""

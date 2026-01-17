@@ -29,7 +29,7 @@ def verify_internal_key(x_internal_key: Optional[str] = Header(None, alias="X-In
     """Verify internal API key for service-to-service communication."""
     if not x_internal_key:
         raise HTTPException(status_code=401, detail="Internal API key required")
-    if x_internal_key != settings.USAGEFLOW_INTERNAL_API_KEY:
+    if x_internal_key != settings.TOKENTRAIL_INTERNAL_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid internal API key")
     return True
 
@@ -53,16 +53,16 @@ async def validate_api_key(
     _: bool = Depends(verify_internal_key)
 ):
     """
-    Validate a UsageFlow API key and return tenant info.
+    Validate a TokenTrail API key and return tenant info.
     Used by LiteLLM for custom authentication.
     """
     api_key = request.api_key.replace("Bearer ", "")
 
     # Validate format
-    if not api_key.startswith(("uf_live_", "uf_test_")):
+    if not api_key.startswith(("tt_live_", "tt_test_")):
         return ValidateKeyResponse(valid=False)
 
-    environment = "live" if api_key.startswith("uf_live_") else "test"
+    environment = "live" if api_key.startswith("tt_live_") else "test"
 
     # Find matching API key
     result = await db.execute(
@@ -193,7 +193,66 @@ async def track_litellm_usage(
 @router.get("/health")
 async def health_check():
     """Health check endpoint for internal services."""
-    return {"status": "healthy", "service": "usageflow-internal-api"}
+    return {"status": "healthy", "service": "tokentrail-internal-api"}
+
+
+# Budget Limit Check Endpoint
+class BudgetCheckRequest(BaseModel):
+    """Request to check if customer has budget available."""
+    tenant_id: str
+    customer_id: str
+
+
+class BudgetCheckResponse(BaseModel):
+    """Response with budget status."""
+    allowed: bool
+    blocked: bool
+    reason: Optional[str] = None
+    current_spend_usd: Optional[Decimal] = None
+    budget_limit_usd: Optional[Decimal] = None
+
+
+@router.post("/check-budget", response_model=BudgetCheckResponse)
+async def check_customer_budget(
+    request: BudgetCheckRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_internal_key)
+):
+    """
+    Check if a customer can make a request based on their budget limit.
+    Called by LiteLLM callback before processing the request.
+    """
+    try:
+        from app.services.customer_service import CustomerService
+
+        tenant_id = UUID(request.tenant_id)
+        customer_service = CustomerService(db)
+
+        should_block, reason = await customer_service.check_budget_limit(
+            tenant_id=tenant_id,
+            external_id=request.customer_id
+        )
+
+        # Get current status for response
+        customer = await customer_service.get_by_external_id(tenant_id, request.customer_id)
+        budget_status = None
+        if customer and customer.id:
+            budget_status = await customer_service.get_budget_status(tenant_id, customer.id)
+
+        return BudgetCheckResponse(
+            allowed=not should_block,
+            blocked=should_block,
+            reason=reason,
+            current_spend_usd=budget_status.current_spend_usd if budget_status else None,
+            budget_limit_usd=budget_status.budget_limit_usd if budget_status else None
+        )
+    except Exception as e:
+        # On error, allow the request (fail open)
+        return BudgetCheckResponse(
+            allowed=True,
+            blocked=False,
+            reason=f"Budget check failed: {str(e)}"
+        )
 
 
 # Smart Routing Endpoints for LiteLLM

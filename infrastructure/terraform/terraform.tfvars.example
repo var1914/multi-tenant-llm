@@ -1,0 +1,87 @@
+# TokenTrail Terraform Variables
+# Copy this file to terraform.tfvars and customize
+#
+# ╔═══════════════════════════════════════════════════════════════════════════╗
+# ║                    ESTIMATED MONTHLY AWS COSTS                            ║
+# ╠═══════════════════════════════════════════════════════════════════════════╣
+# ║  MINIMUM (validation):     ~$25/mo  (with RDS free tier)                  ║
+# ║    - t3.small EC2          $15                                            ║
+# ║    - db.t3.micro RDS       $0   (free tier)                               ║
+# ║    - Storage + EIP         $10                                            ║
+# ║                                                                           ║
+# ║  RECOMMENDED (validation): ~$45/mo  (with RDS free tier)                  ║
+# ║    - t3.medium EC2         $30                                            ║
+# ║    - db.t3.micro RDS       $0   (free tier)                               ║
+# ║    - Storage + EIP         $15                                            ║
+# ║                                                                           ║
+# ║  PRODUCTION:               ~$120/mo                                       ║
+# ║    - t3.large EC2          $60                                            ║
+# ║    - db.t3.small RDS       $30                                            ║
+# ║    - NAT Gateway           $32  (optional)                                ║
+# ╚═══════════════════════════════════════════════════════════════════════════╝
+
+# =============================================================================
+# REQUIRED - Must be set
+# =============================================================================
+
+# SSH key pair name (create in AWS Console: EC2 > Key Pairs)
+ec2_key_name = "tokentrail-key"
+
+# SECURITY: Restrict SSH access to your IP only!
+# Find your IP: curl -s ifconfig.me
+allowed_ssh_cidrs = ["YOUR_IP_ADDRESS/32"]
+
+# =============================================================================
+# COST OPTIMIZATION (defaults are cost-optimized for validation)
+# =============================================================================
+
+# EC2 Instance - Application Server
+# ┌─────────────┬───────────────┬──────────┬────────────────────────┐
+# │ Instance    │ Specs         │ Cost/mo  │ Recommendation         │
+# ├─────────────┼───────────────┼──────────┼────────────────────────┤
+# │ t3.micro    │ 2 vCPU, 1GB   │ ~$8      │ ❌ Too small           │
+# │ t3.small    │ 2 vCPU, 2GB   │ ~$15     │ ✅ Minimum (default)   │
+# │ t3.medium   │ 2 vCPU, 4GB   │ ~$30     │ ✅ Recommended         │
+# │ t3.large    │ 2 vCPU, 8GB   │ ~$60     │ ✅ 500+ users          │
+# └─────────────┴───────────────┴──────────┴────────────────────────┘
+ec2_instance_type = "t3.small"
+
+# RDS Instance - PostgreSQL Database
+# ┌─────────────┬───────────────┬──────────┬────────────────────────┐
+# │ Instance    │ Specs         │ Cost/mo  │ Recommendation         │
+# ├─────────────┼───────────────┼──────────┼────────────────────────┤
+# │ db.t3.micro │ 2 vCPU, 1GB   │ FREE*    │ ✅ Default (free tier) │
+# │ db.t3.small │ 2 vCPU, 2GB   │ ~$30     │ ✅ For 500+ users      │
+# │ db.t3.medium│ 2 vCPU, 4GB   │ ~$60     │ ✅ Production          │
+# └─────────────┴───────────────┴──────────┴────────────────────────┘
+# * Free tier: 750 hours/month for first 12 months
+db_instance_class    = "db.t3.micro"
+db_allocated_storage = 20  # GB (free tier: up to 20GB)
+
+# NAT Gateway - NOT needed for validation (saves ~$32/mo!)
+# RDS doesn't need outbound internet access for normal operations
+# Only enable if you have Lambda/ECS in private subnets that need internet
+enable_nat_gateway = false
+
+# =============================================================================
+# OPTIONAL - Defaults work for validation
+# =============================================================================
+
+# General
+project_name = "tokentrail"
+environment  = "validation"
+aws_region   = "us-east-1"
+
+# Database settings
+db_name     = "tokentrail"
+db_username = "tokentrail"
+db_multi_az = false  # Set true for production (doubles RDS cost)
+
+# Networking
+vpc_cidr             = "10.0.0.0/16"
+availability_zones   = ["us-east-1a", "us-east-1b"]
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.11.0/24"]
+
+# Domain (optional - leave empty to use EC2 IP address)
+domain_name = ""

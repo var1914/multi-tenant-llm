@@ -23,6 +23,9 @@ class Tenant(Base, UUIDMixin, TimestampMixin):
     smart_routing_enabled = Column(Boolean, default=False)
     routing_strategy = Column(String(50), default="cost_optimized")
 
+    # Prediction settings
+    prediction_alerts_enabled = Column(Boolean, default=True)
+
     # Relationships
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     end_customers = relationship("EndCustomer", back_populates="tenant", cascade="all, delete-orphan")
@@ -30,3 +33,5 @@ class Tenant(Base, UUIDMixin, TimestampMixin):
     current_plan = relationship("PricingPlan", back_populates="tenants")
     billing_periods = relationship("BillingPeriod", back_populates="tenant", cascade="all, delete-orphan")
     routing_decisions = relationship("RoutingDecision", back_populates="tenant", cascade="all, delete-orphan")
+    prediction_alerts = relationship("PredictionAlert", back_populates="tenant", cascade="all, delete-orphan")
+    agent_workflows = relationship("AgentWorkflow", back_populates="tenant", cascade="all, delete-orphan")

@@ -2,43 +2,226 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import JetBrains Mono for that VSCode feel */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
 @layer base {
+  /* VSCode Dark Theme - Applied globally */
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-vscode-bg text-vscode-text antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  /* Custom scrollbar - VSCode style */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-vscode-bg;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-vscode-bgActive rounded;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-vscode-textMuted;
+  }
+
+  /* Selection color */
+  ::selection {
+    @apply bg-vscode-blue/40 text-white;
   }
 }
 
 @layer components {
+  /* Buttons */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    @apply px-4 py-2 rounded-md font-medium transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-vscode-blue focus:ring-offset-2 focus:ring-offset-vscode-bg;
   }
 
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-vscode-blue text-white hover:bg-vscode-blueLight
+           disabled:opacity-50 disabled:cursor-not-allowed
+           shadow-vscode hover:shadow-glow;
   }
 
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
+    @apply bg-vscode-bgActive text-vscode-text hover:bg-vscode-bgHover
+           border border-vscode-border;
   }
 
   .btn-danger {
-    @apply bg-red-600 text-white hover:bg-red-700;
+    @apply bg-vscode-error/20 text-vscode-error hover:bg-vscode-error/30
+           border border-vscode-error/50;
   }
 
+  .btn-ghost {
+    @apply bg-transparent text-vscode-textSecondary hover:text-vscode-text
+           hover:bg-vscode-bgHover;
+  }
+
+  /* Inputs */
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply w-full px-3 py-2
+           bg-vscode-bgInput text-vscode-text
+           border border-vscode-border rounded-md
+           placeholder-vscode-textMuted
+           focus:outline-none focus:border-vscode-borderFocus focus:ring-1 focus:ring-vscode-blue
+           transition-colors duration-200;
   }
 
+  /* Cards - VSCode panel style */
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200;
+    @apply bg-white rounded-xl
+           border border-gray-100
+           shadow-sm;
   }
 
+  .card-hover {
+    @apply card hover:shadow-md hover:border-gray-200 transition-all duration-300;
+  }
+
+  /* Card text helpers for white backgrounds */
+  .card h2, .card h3 {
+    @apply text-gray-900;
+  }
+
+  .card p {
+    @apply text-gray-600;
+  }
+
+  /* Labels */
   .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
+    @apply block text-sm font-medium text-vscode-textSecondary mb-1;
   }
 
+  /* Status badges */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply bg-vscode-success/20 text-vscode-success border border-vscode-success/30;
+  }
+
+  .badge-warning {
+    @apply bg-vscode-warning/20 text-vscode-warning border border-vscode-warning/30;
+  }
+
+  .badge-error {
+    @apply bg-vscode-error/20 text-vscode-error border border-vscode-error/30;
+  }
+
+  .badge-info {
+    @apply bg-vscode-blue/20 text-vscode-info border border-vscode-blue/30;
+  }
+
+  /* Tables */
+  .table-vscode {
+    @apply w-full;
+  }
+
+  .table-vscode thead {
+    @apply bg-vscode-bgSidebar;
+  }
+
+  .table-vscode th {
+    @apply px-4 py-3 text-left text-xs font-medium text-vscode-textSecondary uppercase tracking-wider;
+  }
+
+  .table-vscode tbody tr {
+    @apply border-t border-vscode-border hover:bg-vscode-bgHover transition-colors;
+  }
+
+  .table-vscode td {
+    @apply px-4 py-3 text-sm text-vscode-text;
+  }
+
+  /* Stat cards */
+  .stat-card {
+    @apply card p-6 relative overflow-hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    @apply absolute top-0 left-0 w-1 h-full bg-vscode-blue;
+  }
+
+  .stat-card-success::before {
+    @apply bg-vscode-success;
+  }
+
+  .stat-card-warning::before {
+    @apply bg-vscode-warning;
+  }
+
+  .stat-card-error::before {
+    @apply bg-vscode-error;
+  }
+
+  /* Code blocks */
+  .code-block {
+    @apply bg-vscode-bg text-vscode-text font-mono text-sm p-4 rounded-md
+           border border-vscode-border overflow-x-auto;
+  }
+
+  /* Tabs - VSCode style */
+  .tab-list {
+    @apply flex border-b border-vscode-border;
+  }
+
+  .tab {
+    @apply px-4 py-2 text-sm font-medium text-vscode-textSecondary
+           hover:text-vscode-text hover:bg-vscode-bgHover
+           border-b-2 border-transparent transition-all duration-200;
+  }
+
+  .tab-active {
+    @apply text-vscode-text border-vscode-blue bg-vscode-bgActive;
+  }
+
+  /* Modal overlay */
+  .modal-overlay {
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
+  }
+
+  .modal-content {
+    @apply bg-vscode-bgSidebar border border-vscode-border rounded-lg shadow-vscode-lg;
+  }
+
+  /* Animations */
   .animate-fadeIn {
     animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slideUp {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  /* Glow effect for important elements */
+  .glow-blue {
+    @apply shadow-glow;
+  }
+
+  /* Terminal-style status indicator */
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-dot-online {
+    @apply bg-vscode-success animate-pulse;
+  }
+
+  .status-dot-offline {
+    @apply bg-vscode-error;
+  }
+
+  .status-dot-pending {
+    @apply bg-vscode-warning animate-pulse;
   }
 }
 
@@ -51,4 +234,24 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Chart colors override for dark theme */
+:root {
+  --chart-1: #007acc;
+  --chart-2: #4ec9b0;
+  --chart-3: #c586c0;
+  --chart-4: #dcdcaa;
+  --chart-5: #ce9178;
 }

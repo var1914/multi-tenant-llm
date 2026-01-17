@@ -29,6 +29,9 @@ class CustomerService:
             budget_limit_usd=data.budget_limit_usd,
             budget_alert_threshold=data.budget_alert_threshold,
             budget_alert_enabled=data.budget_alert_enabled,
+            budget_block_on_limit=data.budget_block_on_limit,
+            workflow_budget_usd=data.workflow_budget_usd,
+            workflow_budget_action=data.workflow_budget_action,
         )
         self.db.add(customer)
         await self.db.commit()
@@ -103,6 +106,12 @@ class CustomerService:
             customer.budget_alert_threshold = data.budget_alert_threshold
         if data.budget_alert_enabled is not None:
             customer.budget_alert_enabled = data.budget_alert_enabled
+        if data.budget_block_on_limit is not None:
+            customer.budget_block_on_limit = data.budget_block_on_limit
+        if data.workflow_budget_usd is not None:
+            customer.workflow_budget_usd = data.workflow_budget_usd
+        if data.workflow_budget_action is not None:
+            customer.workflow_budget_action = data.workflow_budget_action
 
         await self.db.commit()
         await self.db.refresh(customer)
@@ -144,14 +153,19 @@ class CustomerService:
         else:
             percentage_used = 0
 
+        is_over_budget = percentage_used >= 100 if budget_limit > 0 else False
+        is_blocked = is_over_budget and (customer.budget_block_on_limit or False)
+
         return CustomerBudgetStatus(
             customer_id=customer.external_id,
             customer_name=customer.name,
             budget_limit_usd=budget_limit if budget_limit > 0 else None,
+            budget_block_on_limit=customer.budget_block_on_limit,
             current_spend_usd=current_spend,
             percentage_used=round(percentage_used, 2),
-            is_over_budget=percentage_used >= 100 if budget_limit > 0 else False,
+            is_over_budget=is_over_budget,
             is_near_threshold=percentage_used >= threshold if budget_limit > 0 else False,
+            is_blocked=is_blocked,
         )
 
     async def get_all_budget_statuses(self, tenant_id: UUID) -> List[CustomerBudgetStatus]:
@@ -168,3 +182,42 @@ class CustomerService:
         # Sort by percentage used (highest first)
         statuses.sort(key=lambda x: x.percentage_used, reverse=True)
         return statuses
+
+    async def check_budget_limit(self, tenant_id: UUID, external_id: str) -> tuple[bool, Optional[str]]:
+        """
+        Check if customer has exceeded budget limit and should be blocked.
+        Returns (should_block, reason_message)
+        """
+        customer = await self.get_by_external_id(tenant_id, external_id)
+        if not customer:
+            # Customer doesn't exist yet, allow request
+            return (False, None)
+
+        # If no budget limit set or blocking disabled, allow request
+        if not customer.budget_limit_usd or customer.budget_limit_usd <= 0:
+            return (False, None)
+
+        if not customer.budget_block_on_limit:
+            return (False, None)
+
+        # Get current month's spend
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        result = await self.db.execute(
+            select(func.sum(UsageEvent.cost_usd))
+            .where(
+                UsageEvent.end_customer_id == customer.id,
+                UsageEvent.event_timestamp >= month_start
+            )
+        )
+        current_spend = result.scalar() or Decimal("0")
+
+        # Check if over budget
+        if current_spend >= customer.budget_limit_usd:
+            return (
+                True,
+                f"Customer '{external_id}' has exceeded their monthly budget limit of ${customer.budget_limit_usd}. Current spend: ${current_spend:.2f}"
+            )
+
+        return (False, None)

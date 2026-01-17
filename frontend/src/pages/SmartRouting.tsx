@@ -178,23 +178,23 @@ export default function SmartRouting() {
       {/* Stats Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="card p-4">
-            <div className="text-sm text-gray-500">Total Decisions (30d)</div>
-            <div className="text-2xl font-bold">{stats.total_decisions.toLocaleString()}</div>
+          <div className="card p-5">
+            <div className="text-sm font-medium text-gray-500">Total Decisions (30d)</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">{stats.total_decisions.toLocaleString()}</div>
           </div>
-          <div className="card p-4">
-            <div className="text-sm text-gray-500">Routing Rate</div>
-            <div className="text-2xl font-bold text-green-600">{stats.routing_rate.toFixed(1)}%</div>
+          <div className="card p-5">
+            <div className="text-sm font-medium text-gray-500">Routing Rate</div>
+            <div className="text-2xl font-bold text-indigo-600 mt-1">{stats.routing_rate.toFixed(1)}%</div>
           </div>
-          <div className="card p-4">
-            <div className="text-sm text-gray-500">Estimated Savings</div>
-            <div className="text-2xl font-bold text-emerald-600">
+          <div className="card p-5">
+            <div className="text-sm font-medium text-gray-500">Estimated Savings</div>
+            <div className="text-2xl font-bold text-emerald-600 mt-1">
               ${stats.total_estimated_savings_usd.toFixed(2)}
             </div>
           </div>
-          <div className="card p-4">
-            <div className="text-sm text-gray-500">Avg Complexity</div>
-            <div className="text-2xl font-bold">{(stats.average_complexity_score * 100).toFixed(0)}%</div>
+          <div className="card p-5">
+            <div className="text-sm font-medium text-gray-500">Avg Complexity</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">{(stats.average_complexity_score * 100).toFixed(0)}%</div>
           </div>
         </div>
       )}
@@ -202,20 +202,23 @@ export default function SmartRouting() {
       {/* Model Distribution */}
       {stats?.model_distribution && Object.keys(stats.model_distribution).length > 0 && (
         <div className="card p-6">
-          <h2 className="text-lg font-semibold mb-4">Model Distribution</h2>
-          <div className="space-y-3">
-            {Object.entries(stats.model_distribution).map(([model, count]) => {
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Model Distribution</h2>
+          <div className="space-y-4">
+            {Object.entries(stats.model_distribution).map(([model, count], index) => {
               const total = Object.values(stats.model_distribution).reduce((a, b) => a + b, 0)
               const percentage = (count / total) * 100
+              // Gradient colors for each bar
+              const colors = ['from-indigo-400 to-indigo-500', 'from-violet-400 to-violet-500', 'from-purple-400 to-purple-500', 'from-blue-400 to-blue-500', 'from-cyan-400 to-cyan-500']
+              const colorClass = colors[index % colors.length]
               return (
                 <div key={model}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium">{model}</span>
-                    <span className="text-gray-500">{count.toLocaleString()} ({percentage.toFixed(1)}%)</span>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="font-medium text-gray-700">{model}</span>
+                    <span className="text-gray-500 font-medium">{count.toLocaleString()} ({percentage.toFixed(1)}%)</span>
                   </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-indigo-600 rounded-full"
+                      className={`h-full bg-gradient-to-r ${colorClass} rounded-full transition-all duration-500`}
                       style={{ width: `${percentage}%` }}
                     />
                   </div>
