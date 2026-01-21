@@ -21,30 +21,16 @@ data "aws_ami" "ubuntu" {
 }
 
 # =============================================================================
-# ELASTIC IP (Static public IP)
-# =============================================================================
-resource "aws_eip" "main" {
-  domain = "vpc"
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-eip"
-  }
-}
-
-resource "aws_eip_association" "main" {
-  instance_id   = aws_instance.main.id
-  allocation_id = aws_eip.main.id
-}
-
-# =============================================================================
-# EC2 INSTANCE
+# EC2 INSTANCE (uses dynamic public IP - update Route 53 DNS when IP changes)
+# Removed Elastic IP to save ~$4/mo
 # =============================================================================
 resource "aws_instance" "main" {
-  ami                    = data.aws_ami.ubuntu.id
-  instance_type          = var.instance_type
-  key_name               = var.key_name
-  subnet_id              = var.public_subnet_id
-  vpc_security_group_ids = [var.security_group_id]
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.instance_type
+  key_name                    = var.key_name
+  subnet_id                   = var.public_subnet_id
+  vpc_security_group_ids      = [var.security_group_id]
+  associate_public_ip_address = true
 
   # Root volume
   root_block_device {

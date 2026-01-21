@@ -118,3 +118,18 @@ variable "db_backup_retention_days" {
   type        = number
   default     = 1  # Free tier limit
 }
+
+# =============================================================================
+# BUDGET ALERTS
+# =============================================================================
+variable "monthly_budget_limit" {
+  description = "Monthly AWS budget limit in USD"
+  type        = string
+  default     = "5"
+}
+
+variable "budget_alert_emails" {
+  description = "Email addresses to receive budget alerts"
+  type        = list(string)
+  default     = []
+}

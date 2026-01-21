@@ -47,11 +47,10 @@ resource "random_id" "suffix" {
   byte_length = 4
 }
 
-# Generate secure passwords
+# Generate secure passwords (no special chars to avoid URL encoding issues)
 resource "random_password" "db_password" {
-  length           = 32
-  special          = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
+  length  = 32
+  special = false
 }
 
 resource "random_password" "jwt_secret" {
@@ -137,8 +136,8 @@ module "ec2" {
   instance_type = var.ec2_instance_type
   key_name      = var.ec2_key_name
 
-  # Database connection info
-  db_host     = module.rds.db_endpoint
+  # Database connection info (use db_address, not db_endpoint which includes port)
+  db_host     = module.rds.db_address
   db_port     = module.rds.db_port
   db_name     = var.db_name
   db_username = var.db_username
@@ -150,6 +149,41 @@ module "ec2" {
 
   # Optional: Domain for SSL
   domain_name = var.domain_name
+}
+
+# =============================================================================
+# AWS BUDGET ALERT ($5/month)
+# =============================================================================
+resource "aws_budgets_budget" "monthly" {
+  name              = "${var.project_name}-${var.environment}-monthly-budget"
+  budget_type       = "COST"
+  limit_amount      = var.monthly_budget_limit
+  limit_unit        = "USD"
+  time_unit         = "MONTHLY"
+  time_period_start = "2024-01-01_00:00"
+
+  cost_filter {
+    name = "TagKeyValue"
+    values = [
+      "user:Project$TokenTrail"
+    ]
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "FORECASTED"
+    subscriber_email_addresses = var.budget_alert_emails
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 100
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
+    subscriber_email_addresses = var.budget_alert_emails
+  }
 }
 
 # =============================================================================
