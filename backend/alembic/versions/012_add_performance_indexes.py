@@ -69,9 +69,16 @@ def upgrade() -> None:
     """)
 
     # Text search index on customer name (for search functionality)
+    # Requires pg_trgm extension - enable it first, skip if not available
     op.execute("""
-        CREATE INDEX IF NOT EXISTS idx_end_customers_name_trgm
-        ON end_customers USING gin (name gin_trgm_ops);
+        DO $$
+        BEGIN
+            CREATE EXTENSION IF NOT EXISTS pg_trgm;
+            CREATE INDEX IF NOT EXISTS idx_end_customers_name_trgm
+            ON end_customers USING gin (name gin_trgm_ops);
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE 'pg_trgm extension not available, skipping trigram index';
+        END $$;
     """)
 
     # ==========================================================================
