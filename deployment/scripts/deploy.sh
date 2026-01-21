@@ -96,24 +96,37 @@ copy_files() {
 # Build frontend
 build_frontend() {
     log_info "Building frontend..."
+    log_info "Looking for frontend at: $REPO_ROOT/frontend"
 
     if [ -d "$REPO_ROOT/frontend" ] && [ -f "$REPO_ROOT/frontend/package.json" ]; then
+        log_info "Found frontend, installing dependencies..."
         cd "$REPO_ROOT/frontend"
-        npm ci --silent
+
+        npm ci
+
+        log_info "Building frontend..."
         npm run build
 
+        log_info "Copying built files to $DEPLOY_DIR/frontend/dist/"
         mkdir -p "$DEPLOY_DIR/frontend/dist"
         cp -r dist/* "$DEPLOY_DIR/frontend/dist/"
 
         cd "$REPO_ROOT"
         log_info "Frontend built successfully"
     else
-        log_warn "Frontend not found at $REPO_ROOT/frontend, skipping build"
-        # Create placeholder
+        log_warn "Frontend not found at $REPO_ROOT/frontend"
+        log_warn "Creating placeholder..."
         mkdir -p "$DEPLOY_DIR/frontend/dist"
-        if [ ! -f "$DEPLOY_DIR/frontend/dist/index.html" ]; then
-            echo "<html><body><h1>TokenTrail</h1><p>Frontend deploying...</p></body></html>" > "$DEPLOY_DIR/frontend/dist/index.html"
-        fi
+        cat > "$DEPLOY_DIR/frontend/dist/index.html" <<'HTML'
+<!DOCTYPE html>
+<html>
+<head><title>TokenTrail</title>
+<style>body{font-family:sans-serif;background:#0a0a0b;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+h1{background:linear-gradient(to right,#22c55e,#eab308);-webkit-background-clip:text;-webkit-text-fill-color:transparent}</style>
+</head>
+<body><div><h1>TokenTrail</h1><p>Frontend deploying...</p></div></body>
+</html>
+HTML
     fi
 }
 
