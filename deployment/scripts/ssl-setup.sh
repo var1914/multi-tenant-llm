@@ -1,11 +1,14 @@
 #!/bin/bash
 # TokenTrail SSL Setup Script
 # Sets up Let's Encrypt SSL certificates using Certbot
+#
+# Usage: ./ssl-setup.sh <domain> <email>
+# Example: ./ssl-setup.sh tokentrailapp.com admin@tokentrailapp.com
 
 set -e
 
-DOMAIN="${1:-tokentrailapp.com}"
-EMAIL="${2:-tokentrailapp@gmail.com}"
+DOMAIN="${1:-}"
+EMAIL="${2:-}"
 DEPLOY_DIR="/opt/tokentrail"
 
 RED='\033[0;31m'
@@ -17,7 +20,24 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Check prerequisites
+# Validate inputs
+if [ -z "$DOMAIN" ]; then
+    log_error "Domain is required"
+    echo "Usage: $0 <domain> <email>"
+    echo "Example: $0 tokentrailapp.com admin@tokentrailapp.com"
+    exit 1
+fi
+
+if [ -z "$EMAIL" ]; then
+    log_error "Email is required"
+    echo "Usage: $0 <domain> <email>"
+    exit 1
+fi
+
+log_info "Setting up SSL for domain: $DOMAIN"
+log_info "Using email: $EMAIL"
+
+# Install Certbot if not present
 if ! command -v certbot &> /dev/null; then
     log_info "Installing Certbot..."
     sudo snap install --classic certbot
@@ -28,28 +48,27 @@ fi
 log_info "Stopping nginx for certificate generation..."
 docker stop tokentrail-nginx 2>/dev/null || true
 
-# Generate certificate
+# Generate certificate (single domain for now, can add subdomains later)
 log_info "Generating SSL certificate for $DOMAIN..."
 sudo certbot certonly --standalone \
     --non-interactive \
     --agree-tos \
     --email "$EMAIL" \
-    -d "$DOMAIN" \
-    -d "www.$DOMAIN" \
-    -d "app.$DOMAIN" \
-    -d "api.$DOMAIN"
+    -d "$DOMAIN"
 
 # Copy certificates to deployment directory
 log_info "Copying certificates..."
-sudo mkdir -p "$DEPLOY_DIR/certbot/conf"
-sudo cp -rL /etc/letsencrypt/live "$DEPLOY_DIR/certbot/conf/"
-sudo cp -rL /etc/letsencrypt/archive "$DEPLOY_DIR/certbot/conf/"
+sudo mkdir -p "$DEPLOY_DIR/certbot/conf/live/$DOMAIN"
+sudo mkdir -p "$DEPLOY_DIR/certbot/conf/archive/$DOMAIN"
+sudo cp -rL /etc/letsencrypt/live/$DOMAIN/* "$DEPLOY_DIR/certbot/conf/live/$DOMAIN/"
+sudo cp -rL /etc/letsencrypt/archive/$DOMAIN/* "$DEPLOY_DIR/certbot/conf/archive/$DOMAIN/"
 sudo chown -R ubuntu:ubuntu "$DEPLOY_DIR/certbot"
 
 # Update nginx config to use SSL
 log_info "Updating nginx configuration for SSL..."
-cat > "$DEPLOY_DIR/nginx/conf.d/default.conf" <<'NGINX_EOF'
+cat > "$DEPLOY_DIR/nginx/conf.d/default.conf" <<NGINX_EOF
 # TokenTrail Nginx Configuration with SSL
+# Domain: $DOMAIN
 
 upstream api_backend {
     server api:8000;
@@ -64,14 +83,14 @@ upstream litellm_backend {
 # HTTP - Redirect to HTTPS
 server {
     listen 80;
-    server_name tokentrailapp.com www.tokentrailapp.com app.tokentrailapp.com api.tokentrailapp.com;
+    server_name $DOMAIN www.$DOMAIN;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
     location / {
-        return 301 https://$host$request_uri;
+        return 301 https://\$host\$request_uri;
     }
 }
 
@@ -79,11 +98,11 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name tokentrailapp.com www.tokentrailapp.com app.tokentrailapp.com api.tokentrailapp.com;
+    server_name $DOMAIN www.$DOMAIN;
 
     # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/tokentrailapp.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/tokentrailapp.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
 
     ssl_session_timeout 1d;
     ssl_session_cache shared:SSL:50m;
@@ -111,7 +130,7 @@ server {
     # Frontend
     location / {
         root /usr/share/nginx/html;
-        try_files $uri $uri/ /index.html;
+        try_files \$uri \$uri/ /index.html;
 
         location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
             expires 1y;
@@ -123,10 +142,10 @@ server {
     location /api/ {
         proxy_pass http://api_backend;
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header Connection "";
         proxy_read_timeout 120s;
     }
@@ -135,8 +154,8 @@ server {
     location /v1/ {
         proxy_pass http://litellm_backend;
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header Connection "";
         proxy_read_timeout 300s;
         proxy_buffering off;
@@ -152,6 +171,11 @@ server {
         proxy_pass http://api_backend/redoc;
         proxy_http_version 1.1;
     }
+
+    location /openapi.json {
+        proxy_pass http://api_backend/openapi.json;
+        proxy_http_version 1.1;
+    }
 }
 NGINX_EOF
 
@@ -161,7 +185,7 @@ docker start tokentrail-nginx
 
 # Setup auto-renewal
 log_info "Setting up certificate auto-renewal..."
-cat > /tmp/certbot-renew <<'CRON_EOF'
+cat > /tmp/certbot-renew <<CRON_EOF
 0 0,12 * * * root certbot renew --quiet --deploy-hook "docker restart tokentrail-nginx"
 CRON_EOF
 sudo mv /tmp/certbot-renew /etc/cron.d/certbot-renew
@@ -171,9 +195,7 @@ echo ""
 log_info "SSL setup complete!"
 echo ""
 echo "Your site is now accessible at:"
-echo "  - https://tokentrailapp.com"
-echo "  - https://app.tokentrailapp.com"
-echo "  - https://api.tokentrailapp.com"
+echo "  - https://$DOMAIN"
 echo ""
 echo "Certificates will auto-renew every 12 hours if needed."
 echo ""

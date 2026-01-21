@@ -95,7 +95,7 @@ export default function Workflows() {
   })
 
   // Fetch workflow list
-  const { data: workflowList, isLoading: listLoading } = useQuery<WorkflowListResponse>({
+  const { data: workflowList } = useQuery<WorkflowListResponse>({
     queryKey: ['workflows', statusFilter],
     queryFn: async () => {
       const params = statusFilter ? `?status=${statusFilter}` : ''

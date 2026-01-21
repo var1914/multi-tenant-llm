@@ -117,7 +117,7 @@ export default function Predictions() {
   })
 
   // Fetch alerts
-  const { data: alerts, refetch: refetchAlerts } = useQuery<Alert[]>({
+  const { data: alerts } = useQuery<Alert[]>({
     queryKey: ['prediction-alerts', alertStatusFilter],
     queryFn: async () => {
       const params = alertStatusFilter ? `?status=${alertStatusFilter}` : ''

@@ -79,7 +79,6 @@ function TokenCounter() {
 // Interactive terminal showing real usage
 function InteractiveTerminal() {
   const [step, setStep] = useState(0)
-  const [typing, setTyping] = useState(true)
   const terminalRef = useRef<HTMLDivElement>(null)
 
   const steps = [
@@ -181,7 +180,7 @@ function HowItWorks() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          {steps.map((step, i) => (
+          {steps.map((step) => (
             <div
               key={step.number}
               className="relative p-6 bg-zinc-900/50 rounded-xl border border-zinc-800 hover:border-zinc-700 transition-colors"
