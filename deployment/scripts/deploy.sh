@@ -19,6 +19,18 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Install Node.js if not present
+install_nodejs() {
+    if ! command -v node &> /dev/null; then
+        log_info "Installing Node.js..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+        log_info "Node.js installed: $(node --version)"
+    else
+        log_info "Node.js already installed: $(node --version)"
+    fi
+}
+
 # Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
@@ -212,6 +224,7 @@ main() {
     log_info "Deploy dir: $DEPLOY_DIR"
 
     check_prerequisites
+    install_nodejs
     copy_files
     build_frontend
     build_images
