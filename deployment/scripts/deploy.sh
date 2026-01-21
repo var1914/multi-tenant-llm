@@ -102,7 +102,13 @@ build_frontend() {
         log_info "Found frontend, installing dependencies..."
         cd "$REPO_ROOT/frontend"
 
-        npm ci
+        # Use npm install if package-lock.json doesn't exist, otherwise use npm ci
+        if [ -f "package-lock.json" ]; then
+            npm ci
+        else
+            log_info "No package-lock.json found, using npm install..."
+            npm install
+        fi
 
         log_info "Building frontend..."
         npm run build
