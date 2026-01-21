@@ -1,18 +1,19 @@
 #!/bin/bash
 # TokenTrail Deployment Script
-# Run this script to deploy the application to EC2
+# Run from repo root: ./deployment/scripts/deploy.sh
 
 set -e
 
+# Get the script's directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DEPLOY_DIR="/opt/tokentrail"
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
@@ -32,51 +33,91 @@ check_prerequisites() {
         exit 1
     fi
 
-    if [ ! -f "$PROJECT_ROOT/.env" ]; then
-        log_error ".env file not found at $PROJECT_ROOT/.env"
+    if [ ! -f "$DEPLOY_DIR/.env" ]; then
+        log_error ".env file not found at $DEPLOY_DIR/.env"
+        log_info "Terraform should have created this. Check /opt/tokentrail/.env"
         exit 1
     fi
 
     log_info "Prerequisites check passed"
 }
 
+# Copy deployment files to /opt/tokentrail
+copy_files() {
+    log_info "Copying deployment files to $DEPLOY_DIR..."
+
+    sudo mkdir -p $DEPLOY_DIR
+    sudo chown -R ubuntu:ubuntu $DEPLOY_DIR
+
+    # Copy deployment configs
+    cp "$REPO_ROOT/deployment/docker-compose.prod.yml" "$DEPLOY_DIR/"
+    cp "$REPO_ROOT/deployment/docker-compose.logging.yml" "$DEPLOY_DIR/" 2>/dev/null || true
+    cp "$REPO_ROOT/deployment/litellm_config.yaml" "$DEPLOY_DIR/"
+    cp "$REPO_ROOT/deployment/tokentrail.service" "$DEPLOY_DIR/"
+    cp "$REPO_ROOT/deployment/tokentrail-watchdog.service" "$DEPLOY_DIR/"
+
+    # Copy nginx config
+    mkdir -p "$DEPLOY_DIR/nginx/conf.d"
+    cp "$REPO_ROOT/deployment/nginx/nginx.conf" "$DEPLOY_DIR/nginx/"
+    cp "$REPO_ROOT/deployment/nginx/conf.d/default.conf" "$DEPLOY_DIR/nginx/conf.d/"
+
+    # Copy scripts
+    mkdir -p "$DEPLOY_DIR/scripts"
+    cp "$REPO_ROOT/deployment/scripts/"*.sh "$DEPLOY_DIR/scripts/"
+    chmod +x "$DEPLOY_DIR/scripts/"*.sh
+
+    # Copy backend
+    if [ -d "$REPO_ROOT/backend" ]; then
+        log_info "Copying backend..."
+        cp -r "$REPO_ROOT/backend" "$DEPLOY_DIR/"
+    fi
+
+    # Copy litellm callback
+    if [ -d "$REPO_ROOT/litellm" ]; then
+        log_info "Copying litellm callback..."
+        cp -r "$REPO_ROOT/litellm" "$DEPLOY_DIR/"
+    fi
+
+    log_info "Files copied successfully"
+}
+
 # Build frontend
 build_frontend() {
     log_info "Building frontend..."
 
-    if [ -d "$PROJECT_ROOT/../frontend" ]; then
-        cd "$PROJECT_ROOT/../frontend"
+    if [ -d "$REPO_ROOT/frontend" ] && [ -f "$REPO_ROOT/frontend/package.json" ]; then
+        cd "$REPO_ROOT/frontend"
+        npm ci --silent
+        npm run build
 
-        if [ -f "package.json" ]; then
-            npm ci --silent
-            npm run build
+        mkdir -p "$DEPLOY_DIR/frontend/dist"
+        cp -r dist/* "$DEPLOY_DIR/frontend/dist/"
 
-            # Copy built files
-            mkdir -p "$PROJECT_ROOT/frontend"
-            cp -r dist/* "$PROJECT_ROOT/frontend/" 2>/dev/null || mkdir -p "$PROJECT_ROOT/frontend/dist"
-
-            log_info "Frontend built successfully"
-        else
-            log_warn "No package.json found, skipping frontend build"
-        fi
+        cd "$REPO_ROOT"
+        log_info "Frontend built successfully"
     else
-        log_warn "Frontend directory not found, skipping"
+        log_warn "Frontend not found at $REPO_ROOT/frontend, skipping build"
+        # Create placeholder
+        mkdir -p "$DEPLOY_DIR/frontend/dist"
+        if [ ! -f "$DEPLOY_DIR/frontend/dist/index.html" ]; then
+            echo "<html><body><h1>TokenTrail</h1><p>Frontend deploying...</p></body></html>" > "$DEPLOY_DIR/frontend/dist/index.html"
+        fi
     fi
 }
 
-# Pull/Build Docker images
+# Build Docker images
 build_images() {
     log_info "Building Docker images..."
-    cd "$PROJECT_ROOT"
+    cd "$DEPLOY_DIR"
 
-    docker-compose -f docker-compose.prod.yml build --no-cache
+    docker-compose -f docker-compose.prod.yml build
     log_info "Docker images built successfully"
 }
 
 # Run database migrations
 run_migrations() {
     log_info "Running database migrations..."
-    cd "$PROJECT_ROOT"
+    cd "$DEPLOY_DIR"
 
     docker-compose -f docker-compose.prod.yml run --rm api alembic upgrade head
     log_info "Migrations completed"
@@ -85,7 +126,7 @@ run_migrations() {
 # Deploy services
 deploy_services() {
     log_info "Deploying services..."
-    cd "$PROJECT_ROOT"
+    cd "$DEPLOY_DIR"
 
     # Stop existing services
     docker-compose -f docker-compose.prod.yml down --remove-orphans || true
@@ -100,12 +141,12 @@ deploy_services() {
 setup_systemd() {
     log_info "Setting up systemd services..."
 
-    sudo cp "$PROJECT_ROOT/tokentrail.service" /etc/systemd/system/
-    sudo cp "$PROJECT_ROOT/tokentrail-watchdog.service" /etc/systemd/system/
+    sudo cp "$DEPLOY_DIR/tokentrail.service" /etc/systemd/system/
+    sudo cp "$DEPLOY_DIR/tokentrail-watchdog.service" /etc/systemd/system/ 2>/dev/null || true
 
     sudo systemctl daemon-reload
     sudo systemctl enable tokentrail.service
-    sudo systemctl enable tokentrail-watchdog.service
+    sudo systemctl enable tokentrail-watchdog.service 2>/dev/null || true
 
     log_info "Systemd services configured"
 }
@@ -130,32 +171,35 @@ health_check() {
 
     if [ $attempt -gt $max_attempts ]; then
         log_error "API health check failed after $max_attempts attempts"
-        docker-compose -f docker-compose.prod.yml logs api
+        docker-compose -f docker-compose.prod.yml logs --tail=50 api
         exit 1
     fi
 
-    # Check all containers
     log_info "Container status:"
     docker-compose -f docker-compose.prod.yml ps
 }
 
 # Print deployment summary
 print_summary() {
+    local public_ip=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_IP")
+
     echo ""
     echo "=========================================="
     echo "  TokenTrail Deployment Complete! 🚀"
     echo "=========================================="
     echo ""
     echo "Services running:"
-    docker-compose -f docker-compose.prod.yml ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+    cd "$DEPLOY_DIR"
+    docker-compose -f docker-compose.prod.yml ps
     echo ""
     echo "Access your application:"
-    echo "  - API: http://$(curl -s ifconfig.me):8000"
-    echo "  - LiteLLM: http://$(curl -s ifconfig.me):4000"
-    echo "  - Frontend: http://$(curl -s ifconfig.me)"
+    echo "  - Frontend: http://$public_ip"
+    echo "  - API: http://$public_ip:8000"
+    echo "  - API Docs: http://$public_ip:8000/docs"
+    echo "  - LiteLLM: http://$public_ip:4000"
     echo ""
     echo "Useful commands:"
-    echo "  - View logs: docker-compose -f docker-compose.prod.yml logs -f"
+    echo "  - View logs: cd $DEPLOY_DIR && docker-compose -f docker-compose.prod.yml logs -f"
     echo "  - Restart: sudo systemctl restart tokentrail"
     echo "  - Status: sudo systemctl status tokentrail"
     echo ""
@@ -164,8 +208,12 @@ print_summary() {
 # Main deployment flow
 main() {
     log_info "Starting TokenTrail deployment..."
+    log_info "Repo root: $REPO_ROOT"
+    log_info "Deploy dir: $DEPLOY_DIR"
 
     check_prerequisites
+    copy_files
+    build_frontend
     build_images
     run_migrations
     deploy_services
@@ -181,27 +229,40 @@ case "${1:-deploy}" in
     deploy)
         main
         ;;
+    copy)
+        copy_files
+        ;;
     build)
-        check_prerequisites
         build_frontend
-        build_images
+        cd "$DEPLOY_DIR" && build_images
         ;;
     migrate)
-        run_migrations
+        cd "$DEPLOY_DIR" && run_migrations
         ;;
     restart)
-        deploy_services
+        cd "$DEPLOY_DIR" && deploy_services
         health_check
         ;;
     status)
+        cd "$DEPLOY_DIR"
         docker-compose -f docker-compose.prod.yml ps
-        docker-compose -f docker-compose.prod.yml logs --tail=50
+        docker-compose -f docker-compose.prod.yml logs --tail=20
         ;;
     logs)
+        cd "$DEPLOY_DIR"
         docker-compose -f docker-compose.prod.yml logs -f "${2:-}"
         ;;
     *)
-        echo "Usage: $0 {deploy|build|migrate|restart|status|logs [service]}"
+        echo "Usage: $0 {deploy|copy|build|migrate|restart|status|logs [service]}"
+        echo ""
+        echo "Commands:"
+        echo "  deploy  - Full deployment (copy, build, migrate, start)"
+        echo "  copy    - Copy files to $DEPLOY_DIR"
+        echo "  build   - Build frontend and Docker images"
+        echo "  migrate - Run database migrations"
+        echo "  restart - Restart all services"
+        echo "  status  - Show service status and recent logs"
+        echo "  logs    - Follow logs (optionally specify service)"
         exit 1
         ;;
 esac
