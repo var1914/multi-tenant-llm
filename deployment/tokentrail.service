@@ -1,0 +1,37 @@
+[Unit]
+Description=TokenTrail Application Stack
+Documentation=https://docs.tokentrailapp.com
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/tokentrail
+Environment=COMPOSE_PROJECT_NAME=tokentrail
+
+# Start command
+ExecStart=/usr/local/bin/docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+
+# Stop command
+ExecStop=/usr/local/bin/docker-compose -f docker-compose.prod.yml down
+
+# Reload command (for config changes)
+ExecReload=/usr/local/bin/docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+
+# Restart on failure
+Restart=on-failure
+RestartSec=30
+
+# User permissions
+User=ubuntu
+Group=docker
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tokentrail
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,81 @@
+# TokenTrail LiteLLM Configuration
+# This config integrates with TokenTrail for usage tracking
+
+model_list:
+  # OpenAI Models
+  - model_name: gpt-4-turbo
+    litellm_params:
+      model: openai/gpt-4-turbo
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: gpt-3.5-turbo
+    litellm_params:
+      model: openai/gpt-3.5-turbo
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Anthropic Models
+  - model_name: claude-3-5-sonnet
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-3-opus
+    litellm_params:
+      model: anthropic/claude-3-opus-20240229
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: claude-3-haiku
+    litellm_params:
+      model: anthropic/claude-3-haiku-20240307
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+# General settings
+litellm_settings:
+  # Enable streaming
+  stream: true
+
+  # Request timeout
+  request_timeout: 300
+
+  # Retry configuration
+  num_retries: 3
+  retry_after: 5
+
+  # Caching (uses Redis)
+  cache: true
+  cache_params:
+    type: redis
+    host: redis
+    port: 6379
+
+  # Logging
+  set_verbose: false
+
+  # Drop unmapped params to avoid errors
+  drop_params: true
+
+# Router settings for load balancing
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  timeout: 300
+  retry_after: 5
+
+# Callbacks for TokenTrail integration
+# The callback sends usage data to TokenTrail API
+callbacks:
+  - custom_callback
+
+environment_variables:
+  TOKENTRAIL_API_URL: "http://api:8000"
+  TOKENTRAIL_INTERNAL_API_KEY: "os.environ/USAGEFLOW_INTERNAL_API_KEY"

@@ -1,0 +1,29 @@
+[Unit]
+Description=TokenTrail Container Watchdog
+Documentation=https://docs.tokentrailapp.com
+Requires=tokentrail.service
+After=tokentrail.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tokentrail
+Environment=COMPOSE_PROJECT_NAME=tokentrail
+
+# Watchdog script that monitors and restarts unhealthy containers
+ExecStart=/opt/tokentrail/scripts/watchdog.sh
+
+# Restart watchdog if it crashes
+Restart=always
+RestartSec=10
+
+# User permissions
+User=ubuntu
+Group=docker
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tokentrail-watchdog
+
+[Install]
+WantedBy=multi-user.target

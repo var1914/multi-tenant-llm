@@ -1,0 +1,51 @@
+version: '3.9'
+
+# =============================================================================
+# TokenTrail CloudWatch Logging Extension
+# Use with: docker-compose -f docker-compose.prod.yml -f docker-compose.logging.yml up -d
+# =============================================================================
+
+services:
+  # Override API logging to use CloudWatch
+  api:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-eu-central-1}
+        awslogs-group: /tokentrail/api
+        awslogs-stream: ${HOSTNAME:-api}
+        awslogs-create-group: "true"
+        tag: "{{.Name}}/{{.ID}}"
+
+  # Override LiteLLM logging
+  litellm:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-eu-central-1}
+        awslogs-group: /tokentrail/litellm
+        awslogs-stream: ${HOSTNAME:-litellm}
+        awslogs-create-group: "true"
+        tag: "{{.Name}}/{{.ID}}"
+
+  # Override Nginx logging
+  nginx:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-eu-central-1}
+        awslogs-group: /tokentrail/nginx
+        awslogs-stream: ${HOSTNAME:-nginx}
+        awslogs-create-group: "true"
+        tag: "{{.Name}}/{{.ID}}"
+
+  # Override Redis logging
+  redis:
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-eu-central-1}
+        awslogs-group: /tokentrail/redis
+        awslogs-stream: ${HOSTNAME:-redis}
+        awslogs-create-group: "true"
+        tag: "{{.Name}}/{{.ID}}"
