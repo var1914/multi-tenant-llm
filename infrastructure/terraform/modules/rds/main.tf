@@ -20,12 +20,14 @@ resource "aws_db_parameter_group" "main" {
   family = "postgres15"
   name   = "${var.project_name}-${var.environment}-pg-params"
 
-  # Performance tuning for small instance
+  # Static parameters (require reboot)
   parameter {
-    name  = "shared_buffers"
-    value = "{DBInstanceClassMemory/4096}"  # 25% of RAM in 8KB pages
+    name         = "shared_buffers"
+    value        = "{DBInstanceClassMemory/4096}"  # 25% of RAM in 8KB pages
+    apply_method = "pending-reboot"
   }
 
+  # Dynamic parameters
   parameter {
     name  = "effective_cache_size"
     value = "{DBInstanceClassMemory*3/4096}"  # 75% of RAM
@@ -92,6 +94,10 @@ resource "aws_db_parameter_group" "main" {
   tags = {
     Name = "${var.project_name}-${var.environment}-pg-params"
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # =============================================================================
@@ -102,7 +108,7 @@ resource "aws_db_instance" "main" {
 
   # Engine
   engine               = "postgres"
-  engine_version       = "15.4"
+  engine_version       = "15.15"
   instance_class       = var.db_instance_class
   parameter_group_name = aws_db_parameter_group.main.name
 

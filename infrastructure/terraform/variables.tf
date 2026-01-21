@@ -116,5 +116,5 @@ variable "db_multi_az" {
 variable "db_backup_retention_days" {
   description = "Number of days to retain backups"
   type        = number
-  default     = 7
+  default     = 1  # Free tier limit
 }

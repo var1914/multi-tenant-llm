@@ -150,7 +150,7 @@ function HowItWorks() {
       title: 'Point to TokenTrail proxy',
       description: 'Use your existing OpenAI/Anthropic SDK. Just change the baseURL to TokenTrail.',
       code: `const client = new OpenAI({
-  baseURL: 'https://your-proxy.tokentrail.io',
+  baseURL: 'https://api.tokentrailapp.com/v1',
   apiKey: 'tt_live_...'
 })`,
     },
@@ -494,7 +494,7 @@ export default function Landing() {
               <a href="#pricing" className="text-zinc-400 hover:text-white text-sm transition-colors">
                 Pricing
               </a>
-              <a href="https://docs.tokentrail.dev" className="text-zinc-400 hover:text-white text-sm transition-colors">
+              <a href="https://docs.tokentrailapp.com" className="text-zinc-400 hover:text-white text-sm transition-colors">
                 Docs
               </a>
             </div>
