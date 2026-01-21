@@ -19,18 +19,6 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Install Node.js if not present
-install_nodejs() {
-    if ! command -v node &> /dev/null; then
-        log_info "Installing Node.js..."
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-        sudo apt-get install -y nodejs
-        log_info "Node.js installed: $(node --version)"
-    else
-        log_info "Node.js already installed: $(node --version)"
-    fi
-}
-
 # Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
@@ -78,10 +66,16 @@ copy_files() {
     cp "$REPO_ROOT/deployment/scripts/"*.sh "$DEPLOY_DIR/scripts/"
     chmod +x "$DEPLOY_DIR/scripts/"*.sh
 
-    # Copy backend
+    # Copy backend (for Docker build context)
     if [ -d "$REPO_ROOT/backend" ]; then
         log_info "Copying backend..."
         cp -r "$REPO_ROOT/backend" "$DEPLOY_DIR/"
+    fi
+
+    # Copy frontend (for Docker build context)
+    if [ -d "$REPO_ROOT/frontend" ]; then
+        log_info "Copying frontend..."
+        cp -r "$REPO_ROOT/frontend" "$DEPLOY_DIR/"
     fi
 
     # Copy litellm callback
@@ -90,59 +84,19 @@ copy_files() {
         cp -r "$REPO_ROOT/litellm" "$DEPLOY_DIR/"
     fi
 
+    # Create certbot directories
+    mkdir -p "$DEPLOY_DIR/certbot/conf" "$DEPLOY_DIR/certbot/www"
+
     log_info "Files copied successfully"
 }
 
-# Build frontend
-build_frontend() {
-    log_info "Building frontend..."
-    log_info "Looking for frontend at: $REPO_ROOT/frontend"
-
-    if [ -d "$REPO_ROOT/frontend" ] && [ -f "$REPO_ROOT/frontend/package.json" ]; then
-        log_info "Found frontend, installing dependencies..."
-        cd "$REPO_ROOT/frontend"
-
-        # Use npm install if package-lock.json doesn't exist, otherwise use npm ci
-        if [ -f "package-lock.json" ]; then
-            npm ci
-        else
-            log_info "No package-lock.json found, using npm install..."
-            npm install
-        fi
-
-        log_info "Building frontend..."
-        npm run build
-
-        log_info "Copying built files to $DEPLOY_DIR/frontend/dist/"
-        mkdir -p "$DEPLOY_DIR/frontend/dist"
-        cp -r dist/* "$DEPLOY_DIR/frontend/dist/"
-
-        cd "$REPO_ROOT"
-        log_info "Frontend built successfully"
-    else
-        log_warn "Frontend not found at $REPO_ROOT/frontend"
-        log_warn "Creating placeholder..."
-        mkdir -p "$DEPLOY_DIR/frontend/dist"
-        cat > "$DEPLOY_DIR/frontend/dist/index.html" <<'HTML'
-<!DOCTYPE html>
-<html>
-<head><title>TokenTrail</title>
-<style>body{font-family:sans-serif;background:#0a0a0b;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
-h1{background:linear-gradient(to right,#22c55e,#eab308);-webkit-background-clip:text;-webkit-text-fill-color:transparent}</style>
-</head>
-<body><div><h1>TokenTrail</h1><p>Frontend deploying...</p></div></body>
-</html>
-HTML
-    fi
-}
-
-# Build Docker images
+# Build Docker images (includes frontend build inside container)
 build_images() {
     log_info "Building Docker images..."
     cd "$DEPLOY_DIR"
 
     docker-compose -f docker-compose.prod.yml build
-    log_info "Docker images built successfully"
+    log_info "Docker images built successfully (frontend built inside container)"
 }
 
 # Run database migrations
@@ -216,7 +170,7 @@ print_summary() {
 
     echo ""
     echo "=========================================="
-    echo "  TokenTrail Deployment Complete! 🚀"
+    echo "  TokenTrail Deployment Complete!"
     echo "=========================================="
     echo ""
     echo "Services running:"
@@ -243,9 +197,7 @@ main() {
     log_info "Deploy dir: $DEPLOY_DIR"
 
     check_prerequisites
-    install_nodejs
     copy_files
-    build_frontend
     build_images
     run_migrations
     deploy_services
@@ -265,7 +217,6 @@ case "${1:-deploy}" in
         copy_files
         ;;
     build)
-        build_frontend
         cd "$DEPLOY_DIR" && build_images
         ;;
     migrate)
@@ -290,7 +241,7 @@ case "${1:-deploy}" in
         echo "Commands:"
         echo "  deploy  - Full deployment (copy, build, migrate, start)"
         echo "  copy    - Copy files to $DEPLOY_DIR"
-        echo "  build   - Build frontend and Docker images"
+        echo "  build   - Build Docker images (frontend built inside container)"
         echo "  migrate - Run database migrations"
         echo "  restart - Restart all services"
         echo "  status  - Show service status and recent logs"
