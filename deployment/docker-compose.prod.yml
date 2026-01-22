@@ -87,6 +87,8 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      # Override DATABASE_URL for LiteLLM (Prisma needs postgresql:// not postgresql+asyncpg://)
+      - DATABASE_URL=${LITELLM_DATABASE_URL:-postgresql://tokentrail:password@postgres:5432/tokentrail}
     volumes:
       - ./litellm_config.yaml:/app/config.yaml:ro
     command: --config /app/config.yaml

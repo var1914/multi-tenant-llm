@@ -43,6 +43,9 @@ model_list:
 general_settings:
   database_url: null
   store_model_in_db: false
+  # Disable LiteLLM's built-in auth - TokenTrail handles key validation
+  master_key: null
+  enable_jwt_auth: false
 
 litellm_settings:
   # Enable streaming
