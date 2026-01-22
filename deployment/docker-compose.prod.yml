@@ -112,6 +112,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://tokentrailapp.com
     image: tokentrail-frontend:latest
     container_name: tokentrail-nginx
     restart: always

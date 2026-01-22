@@ -7,6 +7,10 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Build arguments for environment variables
+ARG VITE_API_URL=https://tokentrailapp.com
+ENV VITE_API_URL=$VITE_API_URL
+
 # Copy package files
 COPY package*.json ./
 
