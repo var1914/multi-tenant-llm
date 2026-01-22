@@ -87,8 +87,10 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      # Override DATABASE_URL for LiteLLM (Prisma needs postgresql:// not postgresql+asyncpg://)
-      - DATABASE_URL=${LITELLM_DATABASE_URL:-postgresql://tokentrail:password@postgres:5432/tokentrail}
+      # IMPORTANT: LiteLLM DB disabled - TokenTrail handles all tracking via callbacks
+      # LiteLLM is used as proxy only. If you ever need LiteLLM's built-in features
+      # (virtual keys, spend limits, teams), create a SEPARATE database - never share
+      - DATABASE_URL=
     volumes:
       - ./litellm_config.yaml:/app/config.yaml:ro
     command: --config /app/config.yaml
