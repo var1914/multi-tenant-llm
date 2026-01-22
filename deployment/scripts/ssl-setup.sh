@@ -48,17 +48,35 @@ fi
 log_info "Stopping nginx for certificate generation..."
 docker stop tokentrail-nginx 2>/dev/null || true
 
-# Generate certificate (single domain for now, can add subdomains later)
-log_info "Generating SSL certificate for $DOMAIN..."
-if ! sudo certbot certonly --standalone \
-    --non-interactive \
+# Generate wildcard certificate using DNS validation
+log_info "Generating wildcard SSL certificate for $DOMAIN and *.$DOMAIN..."
+log_info ""
+log_warn "=============================================="
+log_warn "  DNS VALIDATION REQUIRED"
+log_warn "=============================================="
+log_info "Certbot will ask you to create a TXT record."
+log_info "When prompted:"
+log_info "  1. Go to your DNS provider"
+log_info "  2. Add a TXT record:"
+log_info "     Name:  _acme-challenge.$DOMAIN"
+log_info "     Value: <the value certbot shows>"
+log_info "  3. Wait 1-2 minutes for DNS propagation"
+log_info "  4. Press Enter to continue"
+log_info ""
+log_info "You may need to add TWO TXT records (one for each domain)."
+log_info "=============================================="
+log_info ""
+
+if ! certbot certonly --manual \
+    --preferred-challenges dns \
     --agree-tos \
     --email "$EMAIL" \
-    -d "$DOMAIN"; then
+    -d "$DOMAIN" \
+    -d "*.$DOMAIN"; then
     log_error "Certbot failed to generate certificate!"
     log_error "Common causes:"
-    log_error "  1. DNS not pointing to this server - run: dig $DOMAIN +short"
-    log_error "  2. Port 80 blocked - check security group"
+    log_error "  1. TXT record not added correctly"
+    log_error "  2. DNS not propagated yet - wait longer"
     log_error "  3. Rate limit hit - wait and retry"
     log_info "Restarting nginx..."
     docker start tokentrail-nginx 2>/dev/null || true
