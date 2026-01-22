@@ -50,11 +50,28 @@ docker stop tokentrail-nginx 2>/dev/null || true
 
 # Generate certificate (single domain for now, can add subdomains later)
 log_info "Generating SSL certificate for $DOMAIN..."
-sudo certbot certonly --standalone \
+if ! sudo certbot certonly --standalone \
     --non-interactive \
     --agree-tos \
     --email "$EMAIL" \
-    -d "$DOMAIN"
+    -d "$DOMAIN"; then
+    log_error "Certbot failed to generate certificate!"
+    log_error "Common causes:"
+    log_error "  1. DNS not pointing to this server - run: dig $DOMAIN +short"
+    log_error "  2. Port 80 blocked - check security group"
+    log_error "  3. Rate limit hit - wait and retry"
+    log_info "Restarting nginx..."
+    docker start tokentrail-nginx 2>/dev/null || true
+    exit 1
+fi
+
+# Verify certificate was created
+if [ ! -d "/etc/letsencrypt/live/$DOMAIN" ]; then
+    log_error "Certificate directory not found at /etc/letsencrypt/live/$DOMAIN"
+    log_error "Certbot may have failed silently. Check: sudo certbot certificates"
+    docker start tokentrail-nginx 2>/dev/null || true
+    exit 1
+fi
 
 # Copy certificates to deployment directory
 log_info "Copying certificates..."
