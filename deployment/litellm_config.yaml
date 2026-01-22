@@ -39,7 +39,11 @@ model_list:
       model: anthropic/claude-3-haiku-20240307
       api_key: os.environ/ANTHROPIC_API_KEY
 
-# General settings
+# General settings - disable Prisma DB (TokenTrail handles usage tracking)
+general_settings:
+  database_url: null
+  store_model_in_db: false
+
 litellm_settings:
   # Enable streaming
   stream: true
