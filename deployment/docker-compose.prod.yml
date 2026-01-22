@@ -87,10 +87,11 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      # IMPORTANT: LiteLLM DB disabled - TokenTrail handles all tracking via callbacks
-      # LiteLLM is used as proxy only. If you ever need LiteLLM's built-in features
-      # (virtual keys, spend limits, teams), create a SEPARATE database - never share
-      - DATABASE_URL=
+      # IMPORTANT: Completely disable LiteLLM's database/Prisma features
+      # TokenTrail handles all usage tracking via custom callbacks
+      - DISABLE_SPEND_LOGS=true
+      - STORE_MODEL_IN_DB=false
+      - LITELLM_DROP_PARAMS=true
     volumes:
       - ./litellm_config.yaml:/app/config.yaml:ro
     command: --config /app/config.yaml
