@@ -14,12 +14,27 @@ import SmartRouting from './pages/SmartRouting'
 import Predictions from './pages/Predictions'
 import Workflows from './pages/Workflows'
 import AgentEfficiency from './pages/AgentEfficiency'
+import Admin from './pages/Admin'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, user } = useAuthStore()
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (user?.role !== 'admin') {
+    return <Navigate to="/app/dashboard" replace />
   }
 
   return <>{children}</>
@@ -53,6 +68,14 @@ function App() {
         <Route path="api-keys" element={<ApiKeys />} />
         <Route path="billing" element={<Billing />} />
         <Route path="settings" element={<Settings />} />
+        <Route
+          path="admin"
+          element={
+            <AdminRoute>
+              <Admin />
+            </AdminRoute>
+          }
+        />
       </Route>
     </Routes>
   )

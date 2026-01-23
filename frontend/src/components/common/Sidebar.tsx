@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
+import { useAuthStore } from '../../stores/authStore'
 
 const mainNavigation = [
   { name: 'Dashboard', href: '/app/dashboard', icon: DashboardIcon },
@@ -99,6 +100,14 @@ function EfficiencyIcon({ className }: { className?: string }) {
   )
 }
 
+function AdminIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+    </svg>
+  )
+}
+
 // Navigation item component
 function NavItem({ item, isActive }: { item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }; isActive: boolean }) {
   return (
@@ -127,6 +136,8 @@ function NavItem({ item, isActive }: { item: { name: string; href: string; icon:
 
 export default function Sidebar() {
   const location = useLocation()
+  const { user } = useAuthStore()
+  const isAdmin = user?.role === 'admin'
 
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-64 lg:overflow-y-auto lg:bg-vscode-bgSidebar lg:border-r lg:border-vscode-border lg:pb-4">
@@ -180,6 +191,23 @@ export default function Sidebar() {
             <NavItem key={item.name} item={item} isActive={location.pathname === item.href} />
           ))}
         </ul>
+
+        {/* Admin section - only visible to admins */}
+        {isAdmin && (
+          <>
+            <div className="px-3 mt-6 mb-2">
+              <span className="text-xs font-medium text-vscode-textMuted uppercase tracking-wider">
+                Admin
+              </span>
+            </div>
+            <ul role="list" className="space-y-1">
+              <NavItem
+                item={{ name: 'Admin Panel', href: '/app/admin', icon: AdminIcon }}
+                isActive={location.pathname === '/app/admin'}
+              />
+            </ul>
+          </>
+        )}
       </nav>
 
       {/* Bottom status */}
