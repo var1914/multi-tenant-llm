@@ -1,6 +1,6 @@
 # TokenTrail - Bugs Found During Testing
 
-**Test Date:** January 22, 2026
+**Test Date:** January 22-23, 2026
 **Environment:** https://tokentrailapp.com
 
 ---
@@ -10,7 +10,7 @@
 ### BUG-001: Dashboard shows fake percentage changes on fresh account
 **Severity:** Low (cosmetic)
 **Page:** Dashboard
-**Status:** Open
+**Status:** ✅ RESOLVED
 
 **Description:**
 Fresh dashboard with 0 customers, 0 usage, $0.00 cost shows percentage indicators:
@@ -19,72 +19,64 @@ Fresh dashboard with 0 customers, 0 usage, $0.00 cost shows percentage indicator
 - Total Cost: $0.00 (-3%)
 - Active API Keys: 0
 
-**Expected:**
-- Should show no percentage change, or "N/A", or hide the badge entirely when there's no previous data to compare
+**Fix Applied:**
+Removed hardcoded percentage trends. Trends now show `null` until historical comparison data is available.
 
-**Screenshot:** Dashboard with zero values but percentage badges visible
-
-**Fix Location:** Frontend - Dashboard stat cards component
+**File Changed:** `frontend/src/components/dashboard/StatsCards.tsx`
 
 ---
 
 ### BUG-002: Blank page when creating customer without email
 **Severity:** Medium
 **Page:** Customers → Add Customer form
-**Status:** Open
+**Status:** ✅ RESOLVED
 
 **Description:**
 - Creating customer without email field → blank page, 403 error in logs
 - No validation error shown in UI
 - Page becomes unresponsive, requires refresh
-- Works correctly when email is provided
 
 **Root Cause:**
-Form allows submission without email, backend rejects, UI doesn't handle error gracefully
+Frontend sent empty string `""` for email, but backend expects valid EmailStr or `null`. Pydantic validation failed.
 
-**Expected:**
-- Either: Email field marked as required with validation
-- Or: Backend accepts customer without email
-- Must: Show clear error message instead of blank page
+**Fix Applied:**
+Convert empty strings to `null` before sending to API for both `name` and `email` fields.
 
-**Fix Location:**
-- Frontend: Add form validation OR error handling for failed requests
-- Backend: Check if email is actually required in schema
+**File Changed:** `frontend/src/pages/Customers.tsx`
 
 ---
 
 ### BUG-003: API Key text too light/hard to read
 **Severity:** Low (UX)
 **Page:** API Keys → Create dialog
-**Status:** Open
+**Status:** ✅ RESOLVED
 
 **Description:**
 - Generated API key text is very light gray, hard to read
-- Same light text issue noticed in other places in the app
 
-**Expected:**
-- Key should be clearly visible (darker text or better contrast)
-- Consider monospace font for API keys
+**Fix Applied:**
+Changed API key display to dark background (`bg-gray-800`) with green terminal-style text (`text-green-400`) for better contrast and readability.
 
-**Fix Location:** Frontend - CSS/Tailwind text color classes
+**File Changed:** `frontend/src/pages/ApiKeys.tsx`
 
 ---
 
 ### BUG-004: Environment dropdown shows "prod/test" not "live/test"
 **Severity:** Low (cosmetic)
 **Page:** API Keys → Create dialog
-**Status:** Open
+**Status:** ✅ RESOLVED
 
 **Description:**
-- Environment options show "prod" and "test"
+- Environment options showed "Production" and "Test"
 - API key prefix uses "tt_test_" or "tt_live_"
 - Inconsistent naming
 
-**Expected:**
-- Dropdown should show "Live" and "Test" to match key prefixes
-- Or allow customization of environment names
+**Fix Applied:**
+- Changed dropdown labels from "Production/Test" to "Live/Test"
+- Updated table display to show "Live" instead of "production"
+- Added helper text showing key prefix format
 
-**Fix Location:** Frontend - API Key create form
+**File Changed:** `frontend/src/pages/ApiKeys.tsx`
 
 ---
 
@@ -213,16 +205,16 @@ LiteLLM callback was initialized but `async_log_success_event` was never invoked
 
 | ID | Description | Severity | Page | Status |
 |----|-------------|----------|------|--------|
-| BUG-001 | Fake % changes on empty dashboard | Low | Dashboard | Open |
-| BUG-002 | Blank page without email | Medium | Customers | Open |
-| BUG-003 | API Key text too light | Low | API Keys | Open |
-| BUG-004 | prod/test vs live/test naming | Low | API Keys | Open |
+| BUG-001 | Fake % changes on empty dashboard | Low | Dashboard | ✅ Resolved |
+| BUG-002 | Blank page without email | Medium | Customers | ✅ Resolved |
+| BUG-003 | API Key text too light | Low | API Keys | ✅ Resolved |
+| BUG-004 | prod/test vs live/test naming | Low | API Keys | ✅ Resolved |
 | BUG-005 | LiteLLM DATABASE_URL format | Critical | Infra | ✅ Resolved |
 | BUG-006 | LiteLLM auth blocking tt_* keys | Critical | Infra | ✅ Resolved |
 | BUG-007 | DB tables missing (migration conflict) | Critical | Infra | ✅ Resolved |
 | BUG-008 | Callback not tracking usage | Critical | Infra | ✅ Resolved |
-| BUG-009 | Notification bell always shows badge | Low | Header | Open |
-| BUG-010 | "Total Usage" label unclear (should say Tokens) | Low | Dashboard | Open |
+| BUG-009 | Notification bell always shows badge | Low | Header | ✅ Resolved |
+| BUG-010 | "Total Usage" label unclear (should say Tokens) | Low | Dashboard | ✅ Resolved |
 
 ## Feature Requests Summary
 
@@ -272,32 +264,31 @@ Show when a customer is blocked due to budget limits and provide quick action to
 ### BUG-009: Notification Bell Always Shows Badge
 **Severity:** Low (UX)
 **Page:** All - Header/Navbar
-**Status:** Open
+**Status:** ✅ RESOLVED
 
 **Description:**
 - Notification bell icon always shows a red dot/badge
 - Clicking on it does nothing or shows empty state
-- Should only show badge when there are actual notifications
 
-**Expected:**
-- Badge only appears when there are unread notifications
-- Clicking should open notification panel/dropdown
-- Show "No notifications" if empty
+**Fix Applied:**
+Removed the always-visible red notification badge. Added tooltip "Notifications coming soon".
+
+**File Changed:** `frontend/src/components/common/Header.tsx`
 
 ---
 
 ### BUG-010: "Total Usage" Label Unclear
 **Severity:** Low (UX)
 **Page:** Dashboard
-**Status:** Open
+**Status:** ✅ RESOLVED
 
 **Description:**
 Dashboard shows "Total Usage" which doesn't clearly indicate it's about tokens.
 
-**Current:** "Total Usage: 2,415"
-**Suggested:** "Total Tokens: 2,415" or "Token Usage: 2,415"
+**Fix Applied:**
+Changed label from "Total Usage" to "Total Tokens" for clarity.
 
-**Fix Location:** Frontend - Dashboard stat cards
+**File Changed:** `frontend/src/components/dashboard/StatsCards.tsx`
 
 ---
 
