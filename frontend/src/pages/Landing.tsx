@@ -43,19 +43,19 @@ function FeatureHighlights() {
         <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
+        <span>Per-customer tracking</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        <span>Budget limits & blocking</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
         <span>No SDK required</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-        <span>Works with any LLM</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-        <span>Free tier available</span>
       </div>
     </div>
   )
@@ -199,6 +199,138 @@ function SmartRoutingVisualizer() {
         ))}
       </div>
     </div>
+  )
+}
+
+// Dashboard Preview - shows per-customer billing visibility
+function DashboardPreview() {
+  const customers = [
+    { name: 'Acme Corp', tokens: '2.4M', cost: '$127.50', budget: '$150', status: 'warning', percent: 85 },
+    { name: 'TechStart Inc', tokens: '890K', cost: '$45.20', budget: '$100', status: 'healthy', percent: 45 },
+    { name: 'DataFlow AI', tokens: '3.1M', cost: '$165.00', budget: '$150', status: 'blocked', percent: 110 },
+    { name: 'CloudNine', tokens: '1.2M', cost: '$62.40', budget: '$200', status: 'healthy', percent: 31 },
+  ]
+
+  const statusColors = {
+    healthy: 'text-green-400 bg-green-400/10',
+    warning: 'text-amber-400 bg-amber-400/10',
+    blocked: 'text-red-400 bg-red-400/10',
+  }
+
+  const barColors = {
+    healthy: 'bg-green-500',
+    warning: 'bg-amber-500',
+    blocked: 'bg-red-500',
+  }
+
+  return (
+    <section className="py-20 bg-zinc-900/50">
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            See exactly who's spending what
+          </h2>
+          <p className="text-zinc-400 text-lg max-w-2xl mx-auto">
+            Real-time visibility into every customer's AI usage. Set budgets. Get alerts. Block runaway costs.
+          </p>
+        </div>
+
+        {/* Dashboard mockup */}
+        <div className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden shadow-2xl">
+          {/* Dashboard header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800 bg-zinc-900/50">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-red-500/80" />
+              <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+              <div className="w-3 h-3 rounded-full bg-green-500/80" />
+              <span className="text-zinc-500 text-sm ml-2">Customer Usage Dashboard</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs text-zinc-500">Live</span>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="grid grid-cols-4 gap-4 p-6 border-b border-zinc-800">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">4</div>
+              <div className="text-xs text-zinc-500">Active Customers</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-white">7.6M</div>
+              <div className="text-xs text-zinc-500">Tokens This Month</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-400">$400.10</div>
+              <div className="text-xs text-zinc-500">Total Revenue</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-amber-400">1</div>
+              <div className="text-xs text-zinc-500">Budget Alerts</div>
+            </div>
+          </div>
+
+          {/* Customer table */}
+          <div className="p-6">
+            <table className="w-full">
+              <thead>
+                <tr className="text-xs text-zinc-500 border-b border-zinc-800">
+                  <th className="text-left pb-3 font-medium">Customer</th>
+                  <th className="text-right pb-3 font-medium">Tokens</th>
+                  <th className="text-right pb-3 font-medium">Cost</th>
+                  <th className="text-right pb-3 font-medium">Budget</th>
+                  <th className="text-left pb-3 pl-4 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.map((customer, i) => (
+                  <tr key={i} className="border-b border-zinc-800/50 last:border-0">
+                    <td className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400">
+                          {customer.name.charAt(0)}
+                        </div>
+                        <span className="text-sm text-white font-medium">{customer.name}</span>
+                      </div>
+                    </td>
+                    <td className="text-right py-4">
+                      <span className="text-sm text-zinc-300 font-mono">{customer.tokens}</span>
+                    </td>
+                    <td className="text-right py-4">
+                      <span className="text-sm text-white font-mono">{customer.cost}</span>
+                    </td>
+                    <td className="text-right py-4">
+                      <span className="text-sm text-zinc-500 font-mono">{customer.budget}</span>
+                    </td>
+                    <td className="py-4 pl-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden w-24">
+                          <div
+                            className={`h-full ${barColors[customer.status as keyof typeof barColors]} transition-all`}
+                            style={{ width: `${Math.min(customer.percent, 100)}%` }}
+                          />
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[customer.status as keyof typeof statusColors]}`}>
+                          {customer.status === 'blocked' ? 'Blocked' : customer.status === 'warning' ? '85%' : 'OK'}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Callout */}
+        <div className="mt-8 text-center">
+          <p className="text-zinc-500 text-sm">
+            No more surprise bills. No more guessing. <span className="text-white">Know exactly what each customer costs you.</span>
+          </p>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -589,14 +721,14 @@ export default function Landing() {
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
-                Follow every token.
+                Your AI feature works.
                 <br />
-                <span className="text-zinc-500">Cut costs in half.</span>
+                <span className="text-zinc-500">But can you bill for it?</span>
               </h1>
 
               <p className="text-lg text-zinc-400 mb-8 max-w-lg">
-                Track LLM costs per customer. Set spending limits with automatic blocking.
-                Smart routing saves 40-60%. No SDK needed.
+                You added GPT to your SaaS. Users love it. But at month-end: who used what?
+                How do you charge them? TokenTrail tracks every token per customer.
               </p>
 
               <div className="flex flex-wrap gap-4 mb-8">
@@ -627,6 +759,9 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Dashboard Preview */}
+      <DashboardPreview />
+
       {/* How it Works */}
       <div id="how-it-works">
         <HowItWorks />
@@ -650,10 +785,10 @@ export default function Landing() {
       <section className="py-24 bg-black">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Stop overpaying for AI.
+            Start billing for AI today.
           </h2>
           <p className="text-zinc-400 text-lg mb-8">
-            Join the beta. Get 30 days of Pro free.
+            Know what each customer costs. Set limits. Never get a surprise bill again.
           </p>
           <Link
             to="/register"
