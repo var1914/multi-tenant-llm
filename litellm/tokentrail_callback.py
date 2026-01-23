@@ -41,7 +41,7 @@ class TokenTrailCallback(CustomLogger):
         # Cache for routing decisions (request_id -> routed_model)
         self._routing_cache: Dict[str, Dict] = {}
 
-        print(f"[TokenTrail] Callback initialized - API URL: {self.api_url}, Enabled: {self.enabled}, Smart Routing: {self.smart_routing_enabled}")
+        print(f"[TokenTrail] Callback initialized - API URL: {self.api_url}, Enabled: {self.enabled}, Smart Routing: {self.smart_routing_enabled}", flush=True)
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the async HTTP client."""
@@ -115,18 +115,70 @@ class TokenTrailCallback(CustomLogger):
     ) -> Optional[dict]:
         """
         Called before making the LLM API call.
-        1. Check budget limits - block if exceeded
-        2. Apply smart routing if enabled
+        1. Validate API key and get tenant info
+        2. Check budget limits - block if exceeded
+        3. Apply smart routing if enabled
         """
         if not self.enabled:
             return data
 
         try:
-            # Extract tenant info from metadata
             metadata = data.get("metadata", {}) or {}
+
+            # STEP 0: Validate API key and get tenant_id if not already set
             tenant_id = metadata.get("tenant_id")
+            if not tenant_id:
+                # Try to extract API key from user_api_key_dict (UserAPIKeyAuth object)
+                api_key = None
+
+                if user_api_key_dict:
+                    # LiteLLM passes UserAPIKeyAuth object, not dict - use getattr
+                    if hasattr(user_api_key_dict, 'api_key'):
+                        api_key = getattr(user_api_key_dict, 'api_key', None)
+                    elif hasattr(user_api_key_dict, 'token'):
+                        api_key = getattr(user_api_key_dict, 'token', None)
+
+                # Fallback: try to get from proxy_server_request headers
+                if not api_key:
+                    litellm_params = data.get("litellm_params", {}) or {}
+                    proxy_request = litellm_params.get("proxy_server_request", {}) or {}
+                    headers = proxy_request.get("headers", {}) or {}
+                    auth_header = headers.get("authorization") or headers.get("Authorization") or ""
+                    if auth_header.startswith("Bearer "):
+                        api_key = auth_header.replace("Bearer ", "")
+
+                # Validate TokenTrail API key (tt_live_* or tt_test_*)
+                if api_key and api_key.startswith(("tt_live_", "tt_test_")):
+                    try:
+                        client = await self._get_client()
+                        validate_response = await client.post(
+                            f"{self.api_url}/api/v1/internal/validate-key",
+                            json={"api_key": api_key},
+                            headers={
+                                "X-Internal-Key": self.internal_key,
+                                "Content-Type": "application/json"
+                            },
+                            timeout=3.0,
+                        )
+
+                        if validate_response.status_code == 200:
+                            key_info = validate_response.json()
+                            if key_info.get("valid"):
+                                tenant_id = key_info.get("tenant_id")
+                                metadata["tenant_id"] = tenant_id
+                                metadata["tenant_slug"] = key_info.get("tenant_slug")
+                                metadata["key_environment"] = key_info.get("environment")
+                                data["metadata"] = metadata
+                                print(f"[TokenTrail] Validated key for tenant: {key_info.get('tenant_slug')}", flush=True)
+                            else:
+                                print(f"[TokenTrail] Invalid API key", flush=True)
+                                raise Exception("Invalid API key")
+                    except Exception as e:
+                        print(f"[TokenTrail] Key validation error: {str(e)}", flush=True)
+                        # Continue without tenant_id - usage won't be tracked
 
             if not tenant_id:
+                print(f"[TokenTrail] No tenant_id - usage won't be tracked", flush=True)
                 return data
 
             customer_id = self._extract_customer_id({"metadata": metadata}, None)
@@ -151,7 +203,7 @@ class TokenTrailCallback(CustomLogger):
                 if budget_check.get("blocked"):
                     # Block the request by raising an exception
                     reason = budget_check.get("reason", "Budget limit exceeded")
-                    print(f"[TokenTrail] Request blocked: {reason}")
+                    print(f"[TokenTrail] Request blocked: {reason}", flush=True)
                     raise Exception(f"Budget limit exceeded: {reason}")
 
             # STEP 2: Apply smart routing if enabled
@@ -193,7 +245,7 @@ class TokenTrailCallback(CustomLogger):
 
                 if routing.get("routing_applied"):
                     routed_model = routing.get("routed_model")
-                    print(f"[TokenTrail] Smart Routing: {model} -> {routed_model} (complexity: {routing.get('complexity_score', 'N/A')})")
+                    print(f"[TokenTrail] Smart Routing: {model} -> {routed_model} (complexity: {routing.get('complexity_score', 'N/A')})", flush=True)
                     data["model"] = routed_model
                     metadata["original_model"] = model
                     metadata["routed_model"] = routed_model
@@ -202,7 +254,7 @@ class TokenTrailCallback(CustomLogger):
             return data
 
         except Exception as e:
-            print(f"[TokenTrail] Smart routing error: {str(e)}")
+            print(f"[TokenTrail] Smart routing error: {str(e)}", flush=True)
             return data  # Return original data on error
 
     async def async_log_success_event(self, kwargs: dict, response_obj: Any, start_time: datetime, end_time: datetime):
@@ -214,6 +266,8 @@ class TokenTrailCallback(CustomLogger):
             return
 
         try:
+            print(f"[TokenTrail] Success callback triggered", flush=True)
+
             # Extract model info
             model = kwargs.get("model", "unknown")
             litellm_params = kwargs.get("litellm_params", {}) or {}
@@ -242,8 +296,36 @@ class TokenTrailCallback(CustomLogger):
             customer_id = self._extract_customer_id(kwargs, response_obj)
             tenant_id = self._extract_tenant_id(kwargs)
 
+            # If no tenant_id, try to extract from API key in headers
             if not tenant_id:
-                print(f"[TokenTrail] Warning: No tenant_id found in request metadata")
+                proxy_request = litellm_params.get("proxy_server_request", {}) or {}
+                headers = proxy_request.get("headers", {}) or {}
+                auth_header = headers.get("authorization") or headers.get("Authorization") or ""
+
+                if auth_header.startswith("Bearer "):
+                    api_key = auth_header.replace("Bearer ", "")
+                    if api_key.startswith(("tt_live_", "tt_test_")):
+                        try:
+                            client = await self._get_client()
+                            validate_response = await client.post(
+                                f"{self.api_url}/api/v1/internal/validate-key",
+                                json={"api_key": api_key},
+                                headers={
+                                    "X-Internal-Key": self.internal_key,
+                                    "Content-Type": "application/json"
+                                },
+                                timeout=3.0,
+                            )
+                            if validate_response.status_code == 200:
+                                key_info = validate_response.json()
+                                if key_info.get("valid"):
+                                    tenant_id = key_info.get("tenant_id")
+                                    print(f"[TokenTrail] Validated key for tenant: {key_info.get('tenant_slug')}", flush=True)
+                        except Exception as e:
+                            print(f"[TokenTrail] Key validation error in success callback: {str(e)}", flush=True)
+
+            if not tenant_id:
+                print(f"[TokenTrail] Warning: No tenant_id found - cannot track usage", flush=True)
                 return
 
             # Calculate cost
@@ -285,15 +367,15 @@ class TokenTrailCallback(CustomLogger):
             if response.status_code == 200:
                 result = response.json()
                 if result.get("success"):
-                    print(f"[TokenTrail] Tracked usage: {total_tokens} tokens for customer {customer_id}")
+                    print(f"[TokenTrail] Tracked usage: {total_tokens} tokens for customer {customer_id}", flush=True)
                 else:
-                    print(f"[TokenTrail] Failed to track: {result.get('message')}")
+                    print(f"[TokenTrail] Failed to track: {result.get('message')}", flush=True)
             else:
-                print(f"[TokenTrail] HTTP error {response.status_code}: {response.text}")
+                print(f"[TokenTrail] HTTP error {response.status_code}: {response.text}", flush=True)
 
         except Exception as e:
             # Don't fail the request if callback fails
-            print(f"[TokenTrail] Error in callback: {str(e)}")
+            print(f"[TokenTrail] Error in callback: {str(e)}", flush=True)
 
     async def async_log_failure_event(self, kwargs: dict, response_obj: Any, start_time: datetime, end_time: datetime):
         """
@@ -301,6 +383,26 @@ class TokenTrailCallback(CustomLogger):
         We don't track failed requests for billing, but could log for monitoring.
         """
         pass
+
+    async def async_post_call_success_hook(
+        self,
+        data: dict,
+        user_api_key_dict: dict,
+        response,
+    ):
+        """
+        Called by LiteLLM proxy after a successful API call.
+        This hook is called in the proxy context with different parameters.
+        """
+        print(f"[TokenTrail] post_call_success_hook triggered", flush=True)
+        try:
+            # Extract what we can from the data and response
+            from datetime import datetime
+            start_time = datetime.now()
+            end_time = datetime.now()
+            await self.async_log_success_event(data, response, start_time, end_time)
+        except Exception as e:
+            print(f"[TokenTrail] Error in post_call_success_hook: {str(e)}", flush=True)
 
     def log_success_event(self, kwargs: dict, response_obj: Any, start_time: datetime, end_time: datetime):
         """Sync wrapper for async_log_success_event."""

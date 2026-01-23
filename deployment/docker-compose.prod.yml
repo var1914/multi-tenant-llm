@@ -87,13 +87,20 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      # IMPORTANT: Completely disable LiteLLM's database/Prisma features
-      # TokenTrail handles all usage tracking via custom callbacks
       - DISABLE_SPEND_LOGS=true
       - STORE_MODEL_IN_DB=false
       - LITELLM_DROP_PARAMS=true
+      # LiteLLM uses separate database to avoid migration conflicts
+      # Uses SYNC_DATABASE_URL format (postgresql://) with different db name
+      - DATABASE_URL=${LITELLM_DATABASE_URL:-${SYNC_DATABASE_URL}}
+      # TokenTrail callback for usage tracking
+      - LITELLM_CALLBACKS=tokentrail_callback.TokenTrailCallback
+      - TOKENTRAIL_API_URL=http://api:8000
+      - TOKENTRAIL_INTERNAL_API_KEY=${USAGEFLOW_INTERNAL_API_KEY}
+      - TOKENTRAIL_CALLBACK_ENABLED=true
     volumes:
       - ./litellm_config.yaml:/app/config.yaml:ro
+      - ./litellm/tokentrail_callback.py:/app/tokentrail_callback.py:ro
     command: --config /app/config.yaml
     depends_on:
       redis:
