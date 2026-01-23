@@ -1,3 +1,4 @@
+import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import apiClient from '../../api/client'
 
@@ -37,7 +38,13 @@ export default function StatsCards() {
   const totalCost = parseFloat(usageSummary?.total_cost_usd || '0')
   const activeKeys = apiKeys?.filter((k: { is_active: boolean }) => k.is_active).length || 0
 
-  const stats = [
+  const stats: Array<{
+    name: string
+    value: string | number
+    icon: React.ComponentType<{ className?: string }>
+    color: string
+    trend: string | null
+  }> = [
     {
       name: 'Total Customers',
       value: totalCustomers,
