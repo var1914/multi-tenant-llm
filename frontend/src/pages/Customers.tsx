@@ -56,10 +56,15 @@ export default function Customers() {
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
       const payload = {
-        ...data,
+        external_id: data.external_id,
+        name: data.name || null, // Send null instead of empty string
+        email: data.email || null, // Send null instead of empty string
         budget_limit_usd: data.budget_limit_usd ? parseFloat(data.budget_limit_usd) : null,
         budget_alert_threshold: data.budget_alert_threshold ? parseFloat(data.budget_alert_threshold) : 80,
+        budget_alert_enabled: data.budget_alert_enabled,
+        budget_block_on_limit: data.budget_block_on_limit,
         workflow_budget_usd: data.workflow_budget_usd ? parseFloat(data.workflow_budget_usd) : null,
+        workflow_budget_action: data.workflow_budget_action,
       }
       const response = await apiClient.post('/customers', payload)
       return response.data
@@ -78,8 +83,8 @@ export default function Customers() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
       const payload = {
-        name: data.name,
-        email: data.email,
+        name: data.name || null, // Send null instead of empty string
+        email: data.email || null, // Send null instead of empty string
         budget_limit_usd: data.budget_limit_usd ? parseFloat(data.budget_limit_usd) : null,
         budget_alert_threshold: data.budget_alert_threshold ? parseFloat(data.budget_alert_threshold) : 80,
         budget_alert_enabled: data.budget_alert_enabled,

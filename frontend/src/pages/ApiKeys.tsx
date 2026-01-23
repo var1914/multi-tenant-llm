@@ -116,7 +116,7 @@ export default function ApiKeys() {
                           : 'bg-yellow-100 text-yellow-800'
                       }`}
                     >
-                      {key.environment}
+                      {key.environment === 'production' ? 'Live' : 'Test'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -169,9 +169,12 @@ export default function ApiKeys() {
                   value={formData.environment}
                   onChange={(e) => setFormData({ ...formData, environment: e.target.value })}
                 >
-                  <option value="production">Production</option>
+                  <option value="production">Live</option>
                   <option value="test">Test</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Keys will be prefixed with tt_live_ or tt_test_
+                </p>
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button
@@ -204,8 +207,8 @@ export default function ApiKeys() {
                 Make sure to copy your API key now. You won't be able to see it again!
               </p>
             </div>
-            <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-lg font-mono text-sm">
-              <span className="flex-1 break-all">{newKey}</span>
+            <div className="flex items-center gap-2 p-3 bg-gray-800 rounded-lg font-mono text-sm">
+              <span className="flex-1 break-all text-green-400 select-all">{newKey}</span>
               <button
                 onClick={() => copyToClipboard(newKey)}
                 className="btn btn-secondary text-xs"

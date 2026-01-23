@@ -32,31 +32,36 @@ export default function StatsCards() {
     },
   })
 
+  const totalCustomers = customers?.length || 0
+  const totalTokens = usageSummary?.total_quantity || 0
+  const totalCost = parseFloat(usageSummary?.total_cost_usd || '0')
+  const activeKeys = apiKeys?.filter((k: { is_active: boolean }) => k.is_active).length || 0
+
   const stats = [
     {
       name: 'Total Customers',
-      value: customers?.length || 0,
+      value: totalCustomers,
       icon: CustomersIcon,
       color: 'blue',
-      trend: '+12%',
+      trend: null, // No historical data to compare yet
     },
     {
-      name: 'Total Usage',
-      value: usageSummary?.total_quantity?.toLocaleString() || 0,
+      name: 'Total Tokens',
+      value: totalTokens.toLocaleString(),
       icon: UsageIcon,
       color: 'success',
-      trend: '+8%',
+      trend: null, // No historical data to compare yet
     },
     {
       name: 'Total Cost',
-      value: `$${parseFloat(usageSummary?.total_cost_usd || '0').toFixed(2)}`,
+      value: `$${totalCost.toFixed(2)}`,
       icon: CostIcon,
       color: 'warning',
-      trend: '-3%',
+      trend: null, // No historical data to compare yet
     },
     {
       name: 'Active API Keys',
-      value: apiKeys?.filter((k: { is_active: boolean }) => k.is_active).length || 0,
+      value: activeKeys,
       icon: KeyIcon,
       color: 'purple',
       trend: null,
