@@ -107,7 +107,7 @@ export default function PricingCalculator() {
     })).sort((a, b) => a.cost - b.cost)
 
     // Cost breakdown by provider (pie chart)
-    const providerBreakdown = Object.entries(MODEL_PRICING).reduce((acc, [key, value]) => {
+    const providerBreakdown = Object.entries(MODEL_PRICING).reduce((acc, [, value]) => {
       const cost = (inputTokens / 1_000_000) * value.input + (outputTokens / 1_000_000) * value.output
       if (!acc[value.provider]) {
         acc[value.provider] = { provider: value.provider, avgCost: 0, count: 0 }
