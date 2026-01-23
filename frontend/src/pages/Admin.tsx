@@ -13,7 +13,6 @@ import {
   PieChart,
   Pie,
   Cell,
-  Legend,
 } from 'recharts'
 import apiClient from '../api/client'
 import toast from 'react-hot-toast'
