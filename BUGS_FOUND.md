@@ -221,6 +221,83 @@ LiteLLM callback was initialized but `async_log_success_event` was never invoked
 | BUG-006 | LiteLLM auth blocking tt_* keys | Critical | Infra | ✅ Resolved |
 | BUG-007 | DB tables missing (migration conflict) | Critical | Infra | ✅ Resolved |
 | BUG-008 | Callback not tracking usage | Critical | Infra | ✅ Resolved |
+| BUG-009 | Notification bell always shows badge | Low | Header | Open |
+| BUG-010 | "Total Usage" label unclear (should say Tokens) | Low | Dashboard | Open |
+
+## Feature Requests Summary
+
+| ID | Description | Priority | Page |
+|----|-------------|----------|------|
+| FEATURE-001 | Pricing calculator on landing page | Medium | Landing |
+| FEATURE-002 | Smart Routing toggle in UI | High | Settings |
+| FEATURE-003 | Budget blocking visibility & quick actions | High | Dashboard |
+
+---
+
+## Feature Requests (from Testing)
+
+### FEATURE-002: Smart Routing Toggle in UI
+**Priority:** High
+**Page:** Settings / Routing
+
+**Description:**
+Add ability to enable/disable smart routing from the UI with clear choices.
+
+**Current State:**
+- Smart routing is controlled via database field `smart_routing_enabled`
+- No UI toggle exists
+
+**Requested:**
+- Toggle switch in Settings page
+- Show current routing status
+- Option to configure routing rules/thresholds
+
+---
+
+### FEATURE-003: Budget Blocking Visibility in UI
+**Priority:** High
+**Page:** Dashboard / Customers
+
+**Description:**
+Show when a customer is blocked due to budget limits and provide quick action to unblock.
+
+**Requested:**
+- Visual indicator when customer is blocked (red badge/icon)
+- "Blocked Requests" count on dashboard
+- Quick action: "Reset Budget" or "Increase Limit" button
+- Notification when customer gets blocked
+
+---
+
+### BUG-009: Notification Bell Always Shows Badge
+**Severity:** Low (UX)
+**Page:** All - Header/Navbar
+**Status:** Open
+
+**Description:**
+- Notification bell icon always shows a red dot/badge
+- Clicking on it does nothing or shows empty state
+- Should only show badge when there are actual notifications
+
+**Expected:**
+- Badge only appears when there are unread notifications
+- Clicking should open notification panel/dropdown
+- Show "No notifications" if empty
+
+---
+
+### BUG-010: "Total Usage" Label Unclear
+**Severity:** Low (UX)
+**Page:** Dashboard
+**Status:** Open
+
+**Description:**
+Dashboard shows "Total Usage" which doesn't clearly indicate it's about tokens.
+
+**Current:** "Total Usage: 2,415"
+**Suggested:** "Total Tokens: 2,415" or "Token Usage: 2,415"
+
+**Fix Location:** Frontend - Dashboard stat cards
 
 ---
 

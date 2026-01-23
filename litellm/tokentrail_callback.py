@@ -22,6 +22,9 @@ from decimal import Decimal
 from litellm.integrations.custom_logger import CustomLogger
 from litellm import completion_cost
 
+# FastAPI HTTPException for blocking requests
+from fastapi import HTTPException
+
 
 class TokenTrailCallback(CustomLogger):
     """
@@ -181,7 +184,13 @@ class TokenTrailCallback(CustomLogger):
                 print(f"[TokenTrail] No tenant_id - usage won't be tracked", flush=True)
                 return data
 
-            customer_id = self._extract_customer_id({"metadata": metadata}, None)
+            # Extract customer_id - in pre_call_hook, data contains 'user' directly
+            customer_id = (
+                metadata.get("customer_id") or
+                metadata.get("user_id") or
+                data.get("user") or
+                "default_customer"
+            )
 
             # STEP 1: Check budget limits
             client = await self._get_client()
@@ -201,10 +210,10 @@ class TokenTrailCallback(CustomLogger):
             if budget_response.status_code == 200:
                 budget_check = budget_response.json()
                 if budget_check.get("blocked"):
-                    # Block the request by raising an exception
+                    # Block the request using HTTPException (required by LiteLLM to actually block)
                     reason = budget_check.get("reason", "Budget limit exceeded")
                     print(f"[TokenTrail] Request blocked: {reason}", flush=True)
-                    raise Exception(f"Budget limit exceeded: {reason}")
+                    raise HTTPException(status_code=429, detail=f"Budget limit exceeded: {reason}")
 
             # STEP 2: Apply smart routing if enabled
             if not self.smart_routing_enabled:
@@ -253,9 +262,12 @@ class TokenTrailCallback(CustomLogger):
 
             return data
 
+        except HTTPException:
+            # Re-raise HTTPException to block the request
+            raise
         except Exception as e:
-            print(f"[TokenTrail] Smart routing error: {str(e)}", flush=True)
-            return data  # Return original data on error
+            print(f"[TokenTrail] Pre-call hook error: {str(e)}", flush=True)
+            return data  # Return original data on other errors
 
     async def async_log_success_event(self, kwargs: dict, response_obj: Any, start_time: datetime, end_time: datetime):
         """
