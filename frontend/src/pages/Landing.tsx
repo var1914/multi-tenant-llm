@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -35,108 +35,168 @@ function TokenTrailLogo({ className = "w-8 h-8" }: { className?: string }) {
   )
 }
 
-// Animated token counter showing real savings
-function TokenCounter() {
-  const [tokens, setTokens] = useState(0)
-  const [savings, setSavings] = useState(0)
-  const targetTokens = 2847293
-  const targetSavings = 4829
-
-  useEffect(() => {
-    const duration = 2000
-    const steps = 60
-    const tokenStep = targetTokens / steps
-    const savingsStep = targetSavings / steps
-    let current = 0
-
-    const interval = setInterval(() => {
-      current++
-      if (current <= steps) {
-        setTokens(Math.floor(tokenStep * current))
-        setSavings(Math.floor(savingsStep * current))
-      } else {
-        clearInterval(interval)
-      }
-    }, duration / steps)
-
-    return () => clearInterval(interval)
-  }, [])
-
+// Feature highlights below hero CTA
+function FeatureHighlights() {
   return (
-    <div className="flex items-center gap-8 text-sm">
+    <div className="flex flex-wrap items-center gap-6 text-sm text-zinc-400">
       <div className="flex items-center gap-2">
-        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-        <span className="text-zinc-400">Tokens tracked:</span>
-        <span className="font-mono text-white font-medium">{tokens.toLocaleString()}</span>
+        <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        <span>No SDK required</span>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-zinc-400">Saved today:</span>
-        <span className="font-mono text-green-400 font-medium">${savings.toLocaleString()}</span>
+        <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        <span>Works with any LLM</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        <span>Free tier available</span>
       </div>
     </div>
   )
 }
 
-// Interactive terminal showing real usage
-function InteractiveTerminal() {
-  const [step, setStep] = useState(0)
-  const terminalRef = useRef<HTMLDivElement>(null)
+// Smart Routing Visualization - shows how queries route to different models
+function SmartRoutingVisualizer() {
+  const [activeQuery, setActiveQuery] = useState(0)
 
-  const steps = [
-    { type: 'command', text: 'npm install openai' },
-    { type: 'output', text: 'added 3 packages in 1.4s' },
-    { type: 'command', text: 'node app.js' },
-    { type: 'output', text: '✓ Connected to TokenTrail proxy' },
-    { type: 'output', text: '✓ Processing request for customer_abc...' },
-    { type: 'output', text: '  → Model: gpt-4-turbo' },
-    { type: 'output', text: '  → Routed to: gpt-3.5-turbo (same quality)' },
-    { type: 'output', text: '  → 847 tokens ($0.0023 vs $0.0254)' },
-    { type: 'output', text: '  → Saved: $0.0231 (91%)', className: 'text-green-400' },
-    { type: 'output', text: '', className: 'text-green-400 font-medium', fullText: '✓ Request completed in 245ms' },
+  const queries = [
+    { text: '"What is 2+2?"', complexity: 'simple', model: 'GPT-4o-mini', cost: '$0.0006', savedPercent: '94%' },
+    { text: '"Explain quantum physics"', complexity: 'complex', model: 'GPT-4o', cost: '$0.012', savedPercent: '0%' },
+    { text: '"Translate: Hello"', complexity: 'simple', model: 'Claude Haiku', cost: '$0.0003', savedPercent: '96%' },
+    { text: '"Debug this React code..."', complexity: 'complex', model: 'Claude Sonnet', cost: '$0.015', savedPercent: '0%' },
   ]
 
   useEffect(() => {
-    if (step < steps.length) {
-      const delay = steps[step].type === 'command' ? 1500 : 800
-      const timer = setTimeout(() => {
-        setStep(s => s + 1)
-      }, delay)
-      return () => clearTimeout(timer)
-    }
-  }, [step])
+    const interval = setInterval(() => {
+      setActiveQuery(q => (q + 1) % queries.length)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const current = queries[activeQuery]
+  const isSimple = current.complexity === 'simple'
 
   return (
-    <div className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden shadow-2xl">
-      {/* Terminal header */}
-      <div className="flex items-center gap-2 px-4 py-3 bg-zinc-900/50 border-b border-zinc-800">
-        <div className="flex gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-red-500/80" />
-          <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-          <div className="w-3 h-3 rounded-full bg-green-500/80" />
-        </div>
-        <span className="text-zinc-500 text-sm ml-2 font-mono">terminal</span>
+    <div className="bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden shadow-2xl p-6">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-6">
+        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+        <span className="text-zinc-400 text-sm">Smart Routing Active</span>
       </div>
 
-      {/* Terminal content */}
-      <div ref={terminalRef} className="p-4 font-mono text-sm h-64 overflow-hidden">
-        {steps.slice(0, step).map((s, i) => (
-          <div key={i} className={`mb-1 ${s.className || ''}`}>
-            {s.type === 'command' ? (
-              <div className="flex items-center gap-2">
-                <span className="text-green-400">$</span>
-                <span className="text-zinc-300">{s.text}</span>
+      {/* Flow visualization */}
+      <div className="relative">
+        {/* Incoming query */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-lg bg-zinc-800 flex items-center justify-center">
+            <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <div className="text-xs text-zinc-500 mb-1">Incoming Query</div>
+            <div className="text-sm text-zinc-300 font-mono truncate animate-pulse">
+              {current.text}
+            </div>
+          </div>
+        </div>
+
+        {/* Arrow down + analysis */}
+        <div className="flex items-center gap-3 ml-4 mb-6">
+          <div className="w-0.5 h-8 bg-gradient-to-b from-zinc-700 to-zinc-800" />
+          <div className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-500 ${
+            isSimple
+              ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+          }`}>
+            {isSimple ? '✓ Simple query detected' : '⚡ Complex query detected'}
+          </div>
+        </div>
+
+        {/* Routing paths */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Budget models */}
+          <div className={`p-4 rounded-lg border transition-all duration-500 ${
+            isSimple
+              ? 'bg-green-500/5 border-green-500/30 ring-2 ring-green-500/20'
+              : 'bg-zinc-900/50 border-zinc-800 opacity-50'
+          }`}>
+            <div className="text-xs text-zinc-500 mb-2">Budget Models</div>
+            <div className="space-y-1.5">
+              <div className="text-xs text-zinc-400">GPT-4o-mini</div>
+              <div className="text-xs text-zinc-400">Claude Haiku</div>
+              <div className="text-xs text-zinc-400">Gemini Flash</div>
+            </div>
+            {isSimple && (
+              <div className="mt-3 flex items-center gap-1 text-green-400 text-xs font-medium">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+                Routed here
               </div>
-            ) : (
-              <div className="text-zinc-400 pl-4">{s.fullText || s.text}</div>
             )}
           </div>
-        ))}
-        {step < steps.length && (
-          <div className="flex items-center gap-2">
-            {steps[step].type === 'command' && <span className="text-green-400">$</span>}
-            <span className="w-2 h-4 bg-zinc-400 animate-pulse" />
+
+          {/* Premium models */}
+          <div className={`p-4 rounded-lg border transition-all duration-500 ${
+            !isSimple
+              ? 'bg-amber-500/5 border-amber-500/30 ring-2 ring-amber-500/20'
+              : 'bg-zinc-900/50 border-zinc-800 opacity-50'
+          }`}>
+            <div className="text-xs text-zinc-500 mb-2">Premium Models</div>
+            <div className="space-y-1.5">
+              <div className="text-xs text-zinc-400">GPT-4o</div>
+              <div className="text-xs text-zinc-400">Claude Sonnet</div>
+              <div className="text-xs text-zinc-400">Gemini Pro</div>
+            </div>
+            {!isSimple && (
+              <div className="mt-3 flex items-center gap-1 text-amber-400 text-xs font-medium">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+                Routed here
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Result */}
+        <div className="mt-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-zinc-500 mb-1">Routed to</div>
+              <div className="text-sm font-medium text-white">{current.model}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-xs text-zinc-500 mb-1">Cost</div>
+              <div className="text-sm font-mono text-white">{current.cost}</div>
+            </div>
+            {isSimple && (
+              <div className="text-right">
+                <div className="text-xs text-zinc-500 mb-1">Saved</div>
+                <div className="text-sm font-mono text-green-400">{current.savedPercent}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Query indicator dots */}
+      <div className="flex justify-center gap-2 mt-6">
+        {queries.map((_, i) => (
+          <div
+            key={i}
+            className={`w-1.5 h-1.5 rounded-full transition-all ${
+              i === activeQuery ? 'bg-white' : 'bg-zinc-700'
+            }`}
+          />
+        ))}
       </div>
     </div>
   )
@@ -164,7 +224,7 @@ function HowItWorks() {
       number: '03',
       title: 'Optimize automatically',
       description: 'Smart routing sends simple queries to cheaper models. Same results, 40-60% less cost.',
-      metric: { label: 'Avg. cost reduction', value: '47%' },
+      metric: { label: 'Potential savings', value: '40-60%' },
     },
   ]
 
@@ -556,29 +616,13 @@ export default function Landing() {
                 </a>
               </div>
 
-              <TokenCounter />
+              <FeatureHighlights />
             </div>
 
-            {/* Right: Terminal */}
+            {/* Right: Smart Routing Demo */}
             <div className="lg:pl-8">
-              <InteractiveTerminal />
+              <SmartRoutingVisualizer />
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Logos / Social Proof */}
-      <section className="py-12 border-y border-zinc-900">
-        <div className="max-w-6xl mx-auto px-6">
-          <p className="text-center text-zinc-600 text-sm mb-6">
-            Trusted by teams building with AI
-          </p>
-          <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-4 opacity-50">
-            {/* Placeholder logos - replace with actual customer logos */}
-            <span className="text-zinc-500 font-semibold">OpenAI Partners</span>
-            <span className="text-zinc-500 font-semibold">YC Companies</span>
-            <span className="text-zinc-500 font-semibold">AI Startups</span>
-            <span className="text-zinc-500 font-semibold">Enterprise Teams</span>
           </div>
         </div>
       </section>
@@ -598,30 +642,6 @@ export default function Landing() {
       <div id="calculator">
         <PricingCalculator />
       </div>
-
-      {/* Key Metrics */}
-      <section className="py-24 bg-zinc-950 border-y border-zinc-900">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-white mb-2">47%</div>
-              <div className="text-zinc-500 text-sm">Avg. cost reduction</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-white mb-2">&lt;50ms</div>
-              <div className="text-zinc-500 text-sm">Tracking latency</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-white mb-2">5 min</div>
-              <div className="text-zinc-500 text-sm">Integration time</div>
-            </div>
-            <div>
-              <div className="text-4xl md:text-5xl font-bold text-white mb-2">99.9%</div>
-              <div className="text-zinc-500 text-sm">Uptime SLA</div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* Pricing */}
       <Pricing />
@@ -662,22 +682,10 @@ export default function Landing() {
               <a href="#" className="hover:text-white transition-colors">Terms</a>
             </div>
 
-            <div className="flex items-center gap-4">
-              <a href="https://twitter.com/tokentrail" className="text-zinc-500 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
-              </a>
-              <a href="https://github.com/tokentrail" className="text-zinc-500 hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
-                </svg>
-              </a>
-            </div>
           </div>
 
           <div className="mt-8 pt-8 border-t border-zinc-900 text-center text-zinc-600 text-sm">
-            © 2025 TokenTrail. All rights reserved.
+            © 2026 TokenTrail. All rights reserved.
           </div>
         </div>
       </footer>
