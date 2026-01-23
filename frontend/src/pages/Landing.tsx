@@ -5,6 +5,7 @@ import {
   CheckIcon,
   PlayIcon,
 } from '@heroicons/react/24/outline'
+import PricingCalculator from '../components/landing/PricingCalculator'
 
 // TokenTrail Logo Component
 function TokenTrailLogo({ className = "w-8 h-8" }: { className?: string }) {
@@ -490,6 +491,9 @@ export default function Landing() {
               <a href="#how-it-works" className="text-zinc-400 hover:text-white text-sm transition-colors">
                 How it works
               </a>
+              <a href="#calculator" className="text-zinc-400 hover:text-white text-sm transition-colors">
+                Calculator
+              </a>
               <a href="#pricing" className="text-zinc-400 hover:text-white text-sm transition-colors">
                 Pricing
               </a>
@@ -589,6 +593,11 @@ export default function Landing() {
 
       {/* Problem/Solution */}
       <ProblemSolution />
+
+      {/* Pricing Calculator */}
+      <div id="calculator">
+        <PricingCalculator />
+      </div>
 
       {/* Key Metrics */}
       <section className="py-24 bg-zinc-950 border-y border-zinc-900">
