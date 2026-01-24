@@ -69,3 +69,4 @@ alembic/versions/__pycache__/
 # Misc
 *.bak
 *.tmp
+.version
