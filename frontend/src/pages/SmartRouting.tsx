@@ -430,11 +430,17 @@ export default function SmartRouting() {
   // Update settings mutation
   const updateSettingsMutation = useMutation({
     mutationFn: async (newSettings: Partial<RoutingSettings>) => {
+      console.log('Updating settings:', newSettings)
       const response = await apiClient.put('/routing/settings', newSettings)
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Settings updated successfully:', data)
       queryClient.invalidateQueries({ queryKey: ['routing-settings'] })
+    },
+    onError: (error) => {
+      console.error('Failed to update settings:', error)
+      alert('Failed to update routing settings. Check console for details.')
     },
   })
 
@@ -505,24 +511,31 @@ export default function SmartRouting() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Routing Strategy</label>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {settings?.available_strategies && Object.entries(settings.available_strategies).map(([key, value]) => (
-                  <button
-                    key={key}
-                    onClick={() => updateSettingsMutation.mutate({ routing_strategy: key })}
-                    className={clsx(
-                      'p-4 rounded-lg border-2 text-left transition-colors',
-                      settings.routing_strategy === key
-                        ? 'border-indigo-600 bg-indigo-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    )}
-                  >
-                    <div className="font-medium capitalize">{key.replace(/_/g, ' ')}</div>
-                    <div className="text-sm text-gray-500 mt-1">{(value as any).description}</div>
-                    <div className="text-xs text-gray-400 mt-2">
-                      Threshold: {(((value as any).complexity_threshold || 0) * 100).toFixed(0)}%
-                    </div>
-                  </button>
-                ))}
+                {settings?.available_strategies && Object.entries(settings.available_strategies).map(([key, value]) => {
+                  const strategy = value as { description?: string; complexity_threshold?: number }
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        console.log('Clicking strategy:', key)
+                        updateSettingsMutation.mutate({ routing_strategy: key })
+                      }}
+                      className={clsx(
+                        'p-4 rounded-lg border-2 text-left transition-colors cursor-pointer',
+                        settings.routing_strategy === key
+                          ? 'border-indigo-600 bg-indigo-50'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      )}
+                    >
+                      <div className="font-medium capitalize">{key.replace(/_/g, ' ')}</div>
+                      <div className="text-sm text-gray-500 mt-1">{strategy.description || 'No description'}</div>
+                      <div className="text-xs text-gray-400 mt-2">
+                        Threshold: {((strategy.complexity_threshold || 0) * 100).toFixed(0)}%
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>

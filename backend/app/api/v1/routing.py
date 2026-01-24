@@ -25,7 +25,7 @@ router = APIRouter()
 # Request/Response Models
 class RoutingSettingsUpdate(BaseModel):
     smart_routing_enabled: Optional[bool] = None
-    routing_strategy: Optional[str] = Field(None, pattern="^(cost_optimized|balanced|quality_first)$")
+    routing_strategy: Optional[str] = Field(None, pattern="^(cost_optimized|balanced|quality_first|task_optimized)$")
 
 
 class RoutingSettingsResponse(BaseModel):
