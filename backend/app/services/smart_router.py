@@ -3,9 +3,13 @@ Smart Model Routing Service.
 
 Analyzes request complexity and routes to the most cost-effective model
 while maintaining quality for complex tasks.
+
+Combines keyword-based heuristics with semantic task classification
+for improved routing accuracy.
 """
 
 import re
+import logging
 from typing import Optional, Tuple, List, Dict, Any
 from decimal import Decimal
 from uuid import UUID
@@ -14,6 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.routing_decision import RoutingDecision
 from app.models.tenant import Tenant
+from app.services.semantic_router_service import (
+    get_semantic_classifier,
+    is_semantic_router_available,
+)
+
+logger = logging.getLogger(__name__)
 
 
 # Model tier definitions (complexity threshold -> model)
@@ -60,7 +70,11 @@ ROUTING_STRATEGIES = {
 
 
 class ComplexityAnalyzer:
-    """Analyzes request complexity based on content heuristics."""
+    """
+    Analyzes request complexity using a hybrid approach:
+    1. Semantic task classification (embedding-based)
+    2. Keyword-based heuristics (fallback/supplement)
+    """
 
     # Keywords indicating complex tasks
     COMPLEX_KEYWORDS = [
@@ -80,15 +94,30 @@ class ComplexityAnalyzer:
     ]
 
     @classmethod
-    def analyze(cls, messages: List[Dict[str, Any]], model: str) -> Tuple[float, List[str]]:
+    def analyze(
+        cls,
+        messages: List[Dict[str, Any]],
+        model: str,
+        use_semantic: bool = True,
+    ) -> Tuple[float, List[str], Dict[str, Any]]:
         """
-        Analyze complexity of a request.
+        Analyze complexity of a request using hybrid approach.
+
+        Args:
+            messages: List of message dicts
+            model: The requested model
+            use_semantic: Whether to use semantic classification
 
         Returns:
-            Tuple of (complexity_score 0-1, list of reasons)
+            Tuple of (complexity_score 0-1, list of reasons, task_info dict)
         """
         reasons = []
         score = 0.5  # Start at neutral
+        task_info = {
+            "task_type": None,
+            "task_confidence": 0.0,
+            "semantic_available": is_semantic_router_available(),
+        }
 
         # Extract all text content
         text_content = ""
@@ -103,45 +132,59 @@ class ComplexityAnalyzer:
 
         text_lower = text_content.lower()
 
-        # Check for complex keywords
+        # STEP 1: Semantic Task Classification (if available)
+        if use_semantic and is_semantic_router_available():
+            try:
+                classifier = get_semantic_classifier()
+                semantic_result = classifier.analyze_with_task(messages)
+
+                task_info["task_type"] = semantic_result["task_type"]
+                task_info["task_confidence"] = semantic_result["task_confidence"]
+
+                # Apply complexity adjustment based on task type
+                complexity_adj = semantic_result["complexity_adjustment"]
+                score += complexity_adj
+                reasons.append(f"Task: {semantic_result['task_type']} ({semantic_result['recommended_tier']})")
+
+            except Exception as e:
+                logger.warning(f"Semantic classification failed: {e}")
+
+        # STEP 2: Keyword-based heuristics (supplement/fallback)
         complex_count = sum(1 for pattern in cls.COMPLEX_KEYWORDS if re.search(pattern, text_lower))
         if complex_count > 0:
-            complexity_boost = min(0.3, complex_count * 0.1)
+            complexity_boost = min(0.2, complex_count * 0.05)  # Reduced weight when semantic is used
             score += complexity_boost
-            reasons.append(f"Complex task keywords detected ({complex_count})")
+            reasons.append(f"Complex keywords ({complex_count})")
 
-        # Check for simple keywords
         simple_count = sum(1 for pattern in cls.SIMPLE_KEYWORDS if re.search(pattern, text_lower))
         if simple_count > 0:
-            simplicity_reduction = min(0.3, simple_count * 0.1)
+            simplicity_reduction = min(0.2, simple_count * 0.05)
             score -= simplicity_reduction
-            reasons.append(f"Simple task keywords detected ({simple_count})")
+            reasons.append(f"Simple keywords ({simple_count})")
 
-        # Message length heuristics
+        # STEP 3: Structural heuristics
         word_count = len(text_content.split())
         if word_count < 50:
-            score -= 0.1
-            reasons.append("Short request (< 50 words)")
+            score -= 0.05
+            reasons.append("Short request")
         elif word_count > 500:
-            score += 0.1
-            reasons.append("Long request (> 500 words)")
+            score += 0.05
+            reasons.append("Long request")
 
-        # Multi-turn complexity
         if len(messages) > 4:
-            score += 0.1
-            reasons.append(f"Multi-turn conversation ({len(messages)} messages)")
+            score += 0.05
+            reasons.append(f"Multi-turn ({len(messages)} msgs)")
 
-        # Code-related complexity
         if re.search(r"```|def |function |class |import |require\(", text_content):
-            score += 0.15
-            reasons.append("Contains code blocks")
+            score += 0.1
+            reasons.append("Code blocks detected")
 
         # System prompt complexity
         system_messages = [m for m in messages if m.get("role") == "system"]
         if system_messages:
             system_text = " ".join(m.get("content", "") for m in system_messages if isinstance(m.get("content"), str))
             if len(system_text) > 500:
-                score += 0.1
+                score += 0.05
                 reasons.append("Complex system prompt")
 
         # Clamp score to 0-1
@@ -150,6 +193,15 @@ class ComplexityAnalyzer:
         if not reasons:
             reasons.append("Standard complexity")
 
+        return score, reasons, task_info
+
+    @classmethod
+    def analyze_legacy(cls, messages: List[Dict[str, Any]], model: str) -> Tuple[float, List[str]]:
+        """
+        Legacy analyze method for backward compatibility.
+        Returns only score and reasons (without task_info).
+        """
+        score, reasons, _ = cls.analyze(messages, model, use_semantic=False)
         return score, reasons
 
 
@@ -218,14 +270,20 @@ class SmartRouter:
         messages: List[Dict[str, Any]],
         end_customer_id: Optional[UUID] = None,
         request_id: Optional[str] = None,
+        use_semantic: bool = True,
     ) -> Dict[str, Any]:
         """
         Determine optimal model routing for a request.
+
+        Uses hybrid analysis combining:
+        - Semantic task classification (embedding-based)
+        - Keyword heuristics (fallback/supplement)
 
         Returns dict with:
         - routed_model: The model to use
         - routing_applied: Whether routing changed the model
         - complexity_score: The analyzed complexity
+        - task_type: Detected task type (coding, analysis, etc.)
         - routing_reason: Explanation of routing decision
         - estimated_savings: Estimated cost savings in USD
         """
@@ -237,6 +295,9 @@ class SmartRouter:
             "routing_applied": False,
             "complexity_score": None,
             "complexity_reasons": [],
+            "task_type": None,
+            "task_confidence": 0.0,
+            "semantic_routing_used": False,
             "routing_reason": "Routing disabled",
             "estimated_savings_usd": Decimal("0"),
         }
@@ -248,10 +309,15 @@ class SmartRouter:
         strategy = ROUTING_STRATEGIES.get(tenant.routing_strategy, ROUTING_STRATEGIES["balanced"])
         threshold = strategy["complexity_threshold"]
 
-        # Analyze complexity
-        complexity_score, complexity_reasons = self.analyzer.analyze(messages, original_model)
+        # Analyze complexity with semantic classification
+        complexity_score, complexity_reasons, task_info = self.analyzer.analyze(
+            messages, original_model, use_semantic=use_semantic
+        )
         result["complexity_score"] = complexity_score
         result["complexity_reasons"] = complexity_reasons
+        result["task_type"] = task_info.get("task_type")
+        result["task_confidence"] = task_info.get("task_confidence", 0.0)
+        result["semantic_routing_used"] = task_info.get("semantic_available", False)
 
         # Determine provider
         provider = self.get_provider_for_model(original_model)
@@ -262,12 +328,16 @@ class SmartRouter:
             if alternative and alternative.lower() != original_model.lower():
                 result["routed_model"] = alternative
                 result["routing_applied"] = True
-                result["routing_reason"] = f"Low complexity ({complexity_score:.2f}) - routed to {alternative}"
+
+                # Build informative reason
+                task_str = f"[{task_info.get('task_type', 'unknown')}] " if task_info.get("task_type") else ""
+                result["routing_reason"] = f"{task_str}Low complexity ({complexity_score:.2f}) - routed to {alternative}"
                 result["estimated_savings_usd"] = self.estimate_savings(original_model, alternative)
             else:
                 result["routing_reason"] = f"Low complexity but no cheaper alternative available"
         else:
-            result["routing_reason"] = f"Complexity ({complexity_score:.2f}) above threshold ({threshold}) - using original model"
+            task_str = f"[{task_info.get('task_type', 'unknown')}] " if task_info.get("task_type") else ""
+            result["routing_reason"] = f"{task_str}Complexity ({complexity_score:.2f}) above threshold ({threshold}) - using original model"
 
         # Record the routing decision
         await self.record_decision(

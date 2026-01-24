@@ -76,6 +76,9 @@ class RouteRequestResponse(BaseModel):
     routing_applied: bool
     complexity_score: Optional[float]
     complexity_reasons: List[str]
+    task_type: Optional[str] = None
+    task_confidence: float = 0.0
+    semantic_routing_used: bool = False
     routing_reason: str
     estimated_savings_usd: float
 
@@ -216,40 +219,49 @@ async def test_routing(
     """
     Test routing decision without recording it.
 
+    Uses hybrid analysis combining:
+    - Semantic task classification (embedding-based)
+    - Keyword heuristics (fallback/supplement)
+
     Useful for understanding how a request would be routed.
     """
     router_service = SmartRouter(db)
 
+    # Import analyzer
+    from app.services.smart_router import ComplexityAnalyzer, ROUTING_STRATEGIES
+
     # Temporarily check routing without recording
     tenant = await router_service.get_tenant_settings(current_user.tenant_id)
 
-    if not tenant or not tenant.smart_routing_enabled:
-        # Analyze anyway for testing purposes
-        from app.services.smart_router import ComplexityAnalyzer, ROUTING_STRATEGIES
-        complexity_score, complexity_reasons = ComplexityAnalyzer.analyze(request.messages, request.model)
+    # Analyze using hybrid approach (semantic + keywords)
+    complexity_score, complexity_reasons, task_info = ComplexityAnalyzer.analyze(
+        request.messages, request.model, use_semantic=True
+    )
 
+    if not tenant or not tenant.smart_routing_enabled:
         return RouteRequestResponse(
             original_model=request.model,
             routed_model=request.model,
             routing_applied=False,
             complexity_score=complexity_score,
             complexity_reasons=complexity_reasons,
+            task_type=task_info.get("task_type"),
+            task_confidence=task_info.get("task_confidence", 0.0),
+            semantic_routing_used=task_info.get("semantic_available", False),
             routing_reason="Routing disabled - enable to see routing decisions",
             estimated_savings_usd=0,
         )
 
     # Get routing decision (but don't record in test mode)
-    from app.services.smart_router import ComplexityAnalyzer, ROUTING_STRATEGIES
-
     strategy = ROUTING_STRATEGIES.get(tenant.routing_strategy, ROUTING_STRATEGIES["balanced"])
     threshold = strategy["complexity_threshold"]
 
-    complexity_score, complexity_reasons = ComplexityAnalyzer.analyze(request.messages, request.model)
     provider = router_service.get_provider_for_model(request.model)
 
     routed_model = request.model
     routing_applied = False
-    routing_reason = f"Complexity ({complexity_score:.2f}) above threshold ({threshold})"
+    task_str = f"[{task_info.get('task_type', 'unknown')}] " if task_info.get("task_type") else ""
+    routing_reason = f"{task_str}Complexity ({complexity_score:.2f}) above threshold ({threshold})"
     estimated_savings = 0.0
 
     if complexity_score < threshold:
@@ -257,7 +269,7 @@ async def test_routing(
         if alternative and alternative.lower() != request.model.lower():
             routed_model = alternative
             routing_applied = True
-            routing_reason = f"Low complexity ({complexity_score:.2f}) - would route to {alternative}"
+            routing_reason = f"{task_str}Low complexity ({complexity_score:.2f}) - would route to {alternative}"
             estimated_savings = float(router_service.estimate_savings(request.model, alternative))
 
     return RouteRequestResponse(
@@ -266,6 +278,9 @@ async def test_routing(
         routing_applied=routing_applied,
         complexity_score=complexity_score,
         complexity_reasons=complexity_reasons,
+        task_type=task_info.get("task_type"),
+        task_confidence=task_info.get("task_confidence", 0.0),
+        semantic_routing_used=task_info.get("semantic_available", False),
         routing_reason=routing_reason,
         estimated_savings_usd=estimated_savings,
     )
