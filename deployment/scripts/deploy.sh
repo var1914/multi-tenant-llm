@@ -1,6 +1,14 @@
 #!/bin/bash
 # TokenTrail Deployment Script
 # Run from repo root: ./deployment/scripts/deploy.sh
+#
+# Supports two modes:
+#   1. Local build: ./deployment/scripts/deploy.sh deploy
+#   2. ECR pull:    ./deployment/scripts/deploy.sh ecr-deploy [version]
+#
+# ECR versioning:
+#   - Default: reads from .version file (set by push-to-ecr.sh)
+#   - Or specify: ./deployment/scripts/deploy.sh ecr-deploy v1.2.0
 
 set -e
 
@@ -8,6 +16,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DEPLOY_DIR="/opt/tokentrail"
+VERSION_FILE="$DEPLOY_DIR/.version"
+
+# ECR Configuration
+AWS_REGION="${AWS_REGION:-eu-central-1}"
+ENVIRONMENT="${ENVIRONMENT:-production}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -28,7 +41,7 @@ check_prerequisites() {
         exit 1
     fi
 
-    if ! command -v docker-compose &> /dev/null; then
+    if ! command -v docker compose &> /dev/null; then
         log_error "Docker Compose is not installed"
         exit 1
     fi
@@ -50,8 +63,8 @@ copy_files() {
     sudo chown -R ubuntu:ubuntu $DEPLOY_DIR
 
     # Copy deployment configs
-    cp "$REPO_ROOT/deployment/docker-compose.prod.yml" "$DEPLOY_DIR/"
-    cp "$REPO_ROOT/deployment/docker-compose.logging.yml" "$DEPLOY_DIR/" 2>/dev/null || true
+    cp "$REPO_ROOT/deployment/docker compose.prod.yml" "$DEPLOY_DIR/"
+    cp "$REPO_ROOT/deployment/docker compose.logging.yml" "$DEPLOY_DIR/" 2>/dev/null || true
     cp "$REPO_ROOT/deployment/litellm_config.yaml" "$DEPLOY_DIR/"
     cp "$REPO_ROOT/deployment/tokentrail.service" "$DEPLOY_DIR/"
     cp "$REPO_ROOT/deployment/tokentrail-watchdog.service" "$DEPLOY_DIR/"
@@ -95,7 +108,7 @@ build_images() {
     log_info "Building Docker images..."
     cd "$DEPLOY_DIR"
 
-    docker-compose -f docker-compose.prod.yml build
+    docker compose -f docker compose.prod.yml build
     log_info "Docker images built successfully (frontend built inside container)"
 }
 
@@ -104,7 +117,7 @@ run_migrations() {
     log_info "Running database migrations..."
     cd "$DEPLOY_DIR"
 
-    docker-compose -f docker-compose.prod.yml run --rm api alembic upgrade head
+    docker compose -f docker compose.prod.yml run --rm api alembic upgrade head
     log_info "Migrations completed"
 }
 
@@ -114,10 +127,10 @@ deploy_services() {
     cd "$DEPLOY_DIR"
 
     # Stop existing services
-    docker-compose -f docker-compose.prod.yml down --remove-orphans || true
+    docker compose -f docker compose.prod.yml down --remove-orphans || true
 
     # Start services
-    docker-compose -f docker-compose.prod.yml up -d
+    docker compose -f docker compose.prod.yml up -d
 
     log_info "Services deployed"
 }
@@ -156,12 +169,75 @@ health_check() {
 
     if [ $attempt -gt $max_attempts ]; then
         log_error "API health check failed after $max_attempts attempts"
-        docker-compose -f docker-compose.prod.yml logs --tail=50 api
+        docker compose -f docker compose.prod.yml logs --tail=50 api
         exit 1
     fi
 
     log_info "Container status:"
-    docker-compose -f docker-compose.prod.yml ps
+    docker compose -f docker compose.prod.yml ps
+}
+
+# ECR Login
+ecr_login() {
+    log_info "Logging in to ECR..."
+
+    if [ -z "$AWS_ACCOUNT_ID" ]; then
+        AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "")
+        if [ -z "$AWS_ACCOUNT_ID" ]; then
+            log_error "Failed to get AWS account ID. Make sure AWS CLI is configured or IAM role is attached."
+            exit 1
+        fi
+    fi
+
+    ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+    aws ecr get-login-password --region "${AWS_REGION}" | \
+        docker login --username AWS --password-stdin "${ECR_REGISTRY}"
+
+    log_info "ECR login successful"
+}
+
+# Pull images from ECR
+ecr_pull() {
+    local version="${1:-}"
+
+    # Determine version to deploy
+    if [ -z "$version" ]; then
+        if [ -f "$VERSION_FILE" ]; then
+            version=$(cat "$VERSION_FILE")
+            log_info "Using version from .version file: ${version}"
+        else
+            version="latest"
+            log_warn "No version specified and .version file not found. Using 'latest'"
+        fi
+    fi
+
+    export IMAGE_TAG="$version"
+    export ECR_REGISTRY
+    export ENVIRONMENT
+
+    log_info "Pulling images (version: ${IMAGE_TAG})..."
+    cd "$DEPLOY_DIR"
+    docker compose -f docker compose.prod.yml pull
+
+    # Save deployed version
+    echo "${IMAGE_TAG}" > "$VERSION_FILE"
+    log_info "Version ${IMAGE_TAG} saved to .version"
+}
+
+# ECR Deploy (pull from ECR instead of building locally)
+ecr_deploy() {
+    local version="${1:-}"
+
+    log_info "Starting ECR deployment..."
+    log_info "Deploy dir: $DEPLOY_DIR"
+
+    ecr_login
+    ecr_pull "$version"
+    deploy_services
+    health_check
+    print_summary
+
+    log_info "ECR deployment completed successfully!"
 }
 
 # Print deployment summary
@@ -175,7 +251,7 @@ print_summary() {
     echo ""
     echo "Services running:"
     cd "$DEPLOY_DIR"
-    docker-compose -f docker-compose.prod.yml ps
+    docker compose -f docker compose.prod.yml ps
     echo ""
     echo "Access your application:"
     echo "  - Frontend: http://$public_ip"
@@ -184,7 +260,7 @@ print_summary() {
     echo "  - LiteLLM: http://$public_ip:4000"
     echo ""
     echo "Useful commands:"
-    echo "  - View logs: cd $DEPLOY_DIR && docker-compose -f docker-compose.prod.yml logs -f"
+    echo "  - View logs: cd $DEPLOY_DIR && docker compose -f docker compose.prod.yml logs -f"
     echo "  - Restart: sudo systemctl restart tokentrail"
     echo "  - Status: sudo systemctl status tokentrail"
     echo ""
@@ -213,6 +289,13 @@ case "${1:-deploy}" in
     deploy)
         main
         ;;
+    ecr-deploy)
+        ecr_deploy "${2:-}"
+        ;;
+    ecr-pull)
+        ecr_login
+        ecr_pull "${2:-}"
+        ;;
     copy)
         copy_files
         ;;
@@ -228,24 +311,39 @@ case "${1:-deploy}" in
         ;;
     status)
         cd "$DEPLOY_DIR"
-        docker-compose -f docker-compose.prod.yml ps
-        docker-compose -f docker-compose.prod.yml logs --tail=20
+        docker compose -f docker compose.prod.yml ps
+        docker compose -f docker compose.prod.yml logs --tail=20
         ;;
     logs)
         cd "$DEPLOY_DIR"
-        docker-compose -f docker-compose.prod.yml logs -f "${2:-}"
+        docker compose -f docker compose.prod.yml logs -f "${2:-}"
+        ;;
+    version)
+        if [ -f "$VERSION_FILE" ]; then
+            echo "Deployed version: $(cat $VERSION_FILE)"
+        else
+            echo "No version file found"
+        fi
         ;;
     *)
-        echo "Usage: $0 {deploy|copy|build|migrate|restart|status|logs [service]}"
+        echo "Usage: $0 {deploy|ecr-deploy|copy|build|migrate|restart|status|logs|version}"
         echo ""
         echo "Commands:"
-        echo "  deploy  - Full deployment (copy, build, migrate, start)"
-        echo "  copy    - Copy files to $DEPLOY_DIR"
-        echo "  build   - Build Docker images (frontend built inside container)"
-        echo "  migrate - Run database migrations"
-        echo "  restart - Restart all services"
-        echo "  status  - Show service status and recent logs"
-        echo "  logs    - Follow logs (optionally specify service)"
+        echo "  deploy           - Full local deployment (copy, build, migrate, start)"
+        echo "  ecr-deploy [ver] - Deploy from ECR (pull, start) - uses .version or 'latest'"
+        echo "  ecr-pull [ver]   - Pull images from ECR without deploying"
+        echo "  copy             - Copy files to $DEPLOY_DIR"
+        echo "  build            - Build Docker images locally"
+        echo "  migrate          - Run database migrations"
+        echo "  restart          - Restart all services"
+        echo "  status           - Show service status and recent logs"
+        echo "  logs [service]   - Follow logs (optionally specify service)"
+        echo "  version          - Show currently deployed version"
+        echo ""
+        echo "ECR Examples:"
+        echo "  $0 ecr-deploy              # Deploy from .version file"
+        echo "  $0 ecr-deploy 3d3c86f      # Deploy specific git commit"
+        echo "  $0 ecr-deploy v1.0.0       # Deploy semantic version"
         exit 1
         ;;
 esac

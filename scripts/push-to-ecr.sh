@@ -162,10 +162,11 @@ if [ "$ALSO_TAG_LATEST" = true ] && [ "$IMAGE_TAG" != "latest" ]; then
     docker push "${ECR_REGISTRY}/${FRONTEND_REPO}:latest"
 fi
 
-# Save version to file for deployment
+# Save version to file for deployment (will be copied to /opt/tokentrail on EC2)
 VERSION_FILE="${PROJECT_ROOT}/deployment/.version"
 echo "${IMAGE_TAG}" > "${VERSION_FILE}"
 log_info "Version saved to ${VERSION_FILE}"
+log_info "Copy to EC2: scp deployment/.version ubuntu@<EC2_IP>:/opt/tokentrail/"
 
 log_info "Done! Images pushed to ECR:"
 echo ""
@@ -183,4 +184,4 @@ echo "  docker compose -f docker-compose.prod.yml pull"
 echo "  docker compose -f docker-compose.prod.yml up -d"
 echo ""
 log_info "Or use the deploy script:"
-echo "  ./scripts/deploy.sh ${IMAGE_TAG}"
+echo "  ./deployment/scripts/deploy.sh ecr-deploy ${IMAGE_TAG}"
