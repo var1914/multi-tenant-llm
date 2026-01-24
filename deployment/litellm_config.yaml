@@ -38,6 +38,17 @@ model_list:
       model: anthropic/claude-3-haiku-20240307
       api_key: os.environ/ANTHROPIC_API_KEY
 
+  # Google Models (optional - requires GOOGLE_API_KEY)
+  - model_name: gemini-1.5-pro
+    litellm_params:
+      model: gemini/gemini-1.5-pro
+      api_key: os.environ/GOOGLE_API_KEY
+
+  - model_name: gemini-1.5-flash
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: os.environ/GOOGLE_API_KEY
+
 general_settings:
   master_key: null
   enable_jwt_auth: false

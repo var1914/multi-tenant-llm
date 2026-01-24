@@ -29,42 +29,101 @@ logger = logging.getLogger(__name__)
 # Model tier definitions (complexity threshold -> model)
 MODEL_TIERS = {
     "openai": {
-        "premium": ["gpt-4o", "gpt-4-turbo", "gpt-4"],
+        "premium": ["gpt-4o", "gpt-4-turbo"],
         "standard": ["gpt-4o-mini", "gpt-3.5-turbo"],
     },
     "anthropic": {
-        "premium": ["claude-sonnet-4", "claude-3-5-sonnet", "claude-3-opus"],
-        "standard": ["claude-3-haiku", "claude-3-sonnet"],
-    }
+        "premium": ["claude-3-5-sonnet", "claude-3-opus"],
+        "standard": ["claude-3-haiku"],
+    },
+    "google": {
+        "premium": ["gemini-1.5-pro"],
+        "standard": ["gemini-1.5-flash"],
+    },
+}
+
+# Task-specific model recommendations (best model for each task type)
+# Format: task_type -> list of (model, reason) tuples in order of preference
+TASK_MODEL_RECOMMENDATIONS = {
+    "coding": [
+        ("claude-3-5-sonnet", "Excellent at code generation and debugging"),
+        ("gpt-4o", "Strong coding capabilities"),
+        ("gpt-4-turbo", "Good for complex code tasks"),
+    ],
+    "analysis": [
+        ("claude-3-5-sonnet", "Strong analytical reasoning"),
+        ("gpt-4o", "Good at data analysis"),
+        ("gemini-1.5-pro", "Great for document analysis"),
+    ],
+    "reasoning": [
+        ("claude-3-opus", "Best for complex multi-step reasoning"),
+        ("gpt-4o", "Strong logical reasoning"),
+        ("claude-3-5-sonnet", "Good reasoning capabilities"),
+    ],
+    "creative": [
+        ("gpt-4o", "Creative and engaging responses"),
+        ("claude-3-5-sonnet", "Good creative writing"),
+        ("gemini-1.5-pro", "Creative capabilities"),
+    ],
+    "translation": [
+        ("gpt-4o-mini", "Cost-effective for translation"),
+        ("gpt-3.5-turbo", "Good translation at low cost"),
+        ("claude-3-haiku", "Fast translation"),
+    ],
+    "summarization": [
+        ("gpt-4o-mini", "Efficient summarization"),
+        ("claude-3-haiku", "Fast and accurate summaries"),
+        ("gemini-1.5-flash", "Quick summarization"),
+    ],
+    "extraction": [
+        ("gpt-4o-mini", "Efficient data extraction"),
+        ("claude-3-haiku", "Fast extraction"),
+        ("gpt-3.5-turbo", "Cost-effective extraction"),
+    ],
+    "simple": [
+        ("gpt-4o-mini", "Fast and cost-effective"),
+        ("gpt-3.5-turbo", "Quick responses"),
+        ("claude-3-haiku", "Fast and cheap"),
+    ],
 }
 
 # Model cost per 1M tokens (input/output) for savings estimation
 MODEL_COSTS = {
+    # OpenAI
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "gpt-4o-mini": {"input": 0.15, "output": 0.60},
     "gpt-4-turbo": {"input": 10.00, "output": 30.00},
-    "gpt-4": {"input": 30.00, "output": 60.00},
     "gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
-    "claude-sonnet-4": {"input": 3.00, "output": 15.00},
+    # Anthropic
     "claude-3-5-sonnet": {"input": 3.00, "output": 15.00},
     "claude-3-opus": {"input": 15.00, "output": 75.00},
     "claude-3-haiku": {"input": 0.25, "output": 1.25},
-    "claude-3-sonnet": {"input": 3.00, "output": 15.00},
+    # Google
+    "gemini-1.5-pro": {"input": 1.25, "output": 5.00},
+    "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
 }
 
 # Routing strategies
 ROUTING_STRATEGIES = {
     "cost_optimized": {
         "description": "Aggressively route simple tasks to cheaper models",
-        "complexity_threshold": 0.5,  # Route to cheaper if below this
+        "complexity_threshold": 0.5,
+        "use_task_routing": False,
     },
     "balanced": {
         "description": "Balance between cost and quality",
         "complexity_threshold": 0.35,
+        "use_task_routing": False,
     },
     "quality_first": {
         "description": "Only route very simple tasks to cheaper models",
         "complexity_threshold": 0.2,
+        "use_task_routing": False,
+    },
+    "task_optimized": {
+        "description": "Select best model based on task type (coding→Claude, etc.)",
+        "complexity_threshold": 0.35,
+        "use_task_routing": True,
     },
 }
 
@@ -248,6 +307,33 @@ class SmartRouter:
 
         return None
 
+    def get_task_optimized_model(self, task_type: str, available_models: Optional[List[str]] = None) -> Tuple[Optional[str], str]:
+        """
+        Get the best model for a specific task type.
+
+        Args:
+            task_type: The detected task type (coding, analysis, etc.)
+            available_models: Optional list of models that are configured/available
+
+        Returns:
+            Tuple of (model_name, reason) or (None, reason) if no match
+        """
+        recommendations = TASK_MODEL_RECOMMENDATIONS.get(task_type, TASK_MODEL_RECOMMENDATIONS["simple"])
+
+        # If no filter, return first recommendation
+        if not available_models:
+            model, reason = recommendations[0]
+            return model, reason
+
+        # Find first available model from recommendations
+        available_lower = [m.lower() for m in available_models]
+        for model, reason in recommendations:
+            if model.lower() in available_lower:
+                return model, reason
+
+        # Fallback: return first available model
+        return available_models[0] if available_models else None, "No task-specific model available"
+
     def estimate_savings(self, original_model: str, routed_model: str, estimated_tokens: int = 1000) -> Decimal:
         """Estimate cost savings from routing."""
         original_cost = MODEL_COSTS.get(original_model, {"input": 0, "output": 0})
@@ -321,22 +407,34 @@ class SmartRouter:
 
         # Determine provider
         provider = self.get_provider_for_model(original_model)
+        task_type = task_info.get("task_type", "simple")
+        task_str = f"[{task_type}] " if task_type else ""
 
-        # Check if we should route to a cheaper model
-        if complexity_score < threshold:
+        # Task-optimized routing: select best model for the task type
+        if strategy.get("use_task_routing", False) and task_type:
+            # Get all configured models (from MODEL_COSTS as proxy for available models)
+            available_models = list(MODEL_COSTS.keys())
+            recommended_model, reason = self.get_task_optimized_model(task_type, available_models)
+
+            if recommended_model and recommended_model.lower() != original_model.lower():
+                result["routed_model"] = recommended_model
+                result["routing_applied"] = True
+                result["routing_reason"] = f"{task_str}Task-optimized: {reason}"
+                result["estimated_savings_usd"] = self.estimate_savings(original_model, recommended_model)
+            else:
+                result["routing_reason"] = f"{task_str}Already using optimal model for task"
+
+        # Complexity-based routing (cost optimization)
+        elif complexity_score < threshold:
             alternative = self.get_alternative_model(original_model, provider, to_premium=False)
             if alternative and alternative.lower() != original_model.lower():
                 result["routed_model"] = alternative
                 result["routing_applied"] = True
-
-                # Build informative reason
-                task_str = f"[{task_info.get('task_type', 'unknown')}] " if task_info.get("task_type") else ""
                 result["routing_reason"] = f"{task_str}Low complexity ({complexity_score:.2f}) - routed to {alternative}"
                 result["estimated_savings_usd"] = self.estimate_savings(original_model, alternative)
             else:
-                result["routing_reason"] = f"Low complexity but no cheaper alternative available"
+                result["routing_reason"] = f"{task_str}Low complexity but no cheaper alternative available"
         else:
-            task_str = f"[{task_info.get('task_type', 'unknown')}] " if task_info.get("task_type") else ""
             result["routing_reason"] = f"{task_str}Complexity ({complexity_score:.2f}) above threshold ({threshold}) - using original model"
 
         # Record the routing decision
