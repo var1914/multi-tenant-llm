@@ -1,6 +1,14 @@
 # =============================================================================
 # TokenTrail Production Docker Compose
-# Uses external RDS PostgreSQL (no local postgres container)
+# Uses ECR for container images, external RDS PostgreSQL
+# =============================================================================
+#
+# USAGE:
+#   1. Set ECR_REGISTRY in .env (e.g., 123456789.dkr.ecr.us-east-1.amazonaws.com)
+#   2. Login to ECR: aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REGISTRY
+#   3. Pull and run: docker compose -f docker-compose.prod.yml pull && docker compose up -d
+#
+# To build locally instead of ECR, use: docker compose -f docker-compose.local.yml up -d
 # =============================================================================
 
 services:
@@ -29,12 +37,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # FastAPI Backend
+  # FastAPI Backend (from ECR)
   api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: tokentrail-api:latest
+    image: ${ECR_REGISTRY}/tokentrail-${ENVIRONMENT:-production}-api:${IMAGE_TAG:-latest}
     container_name: tokentrail-api
     restart: always
     command: >
@@ -119,14 +124,9 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  # Frontend + Nginx (built inside container)
+  # Frontend + Nginx (from ECR)
   nginx:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: https://tokentrailapp.com
-    image: tokentrail-frontend:latest
+    image: ${ECR_REGISTRY}/tokentrail-${ENVIRONMENT:-production}-frontend:${IMAGE_TAG:-latest}
     container_name: tokentrail-nginx
     restart: always
     ports:

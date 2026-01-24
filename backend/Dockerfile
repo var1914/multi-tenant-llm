@@ -2,7 +2,9 @@
 # TokenTrail Backend - Production Dockerfile
 # =============================================================================
 
-FROM python:3.12-slim-bookworm
+# Python 3.11 recommended for ML packages (semantic-router, sentence-transformers)
+# Python 3.12 has Pydantic v1 compatibility issues with some ML libraries
+FROM python:3.11-slim-bookworm
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \

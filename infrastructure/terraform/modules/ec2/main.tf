@@ -31,6 +31,7 @@ resource "aws_instance" "main" {
   subnet_id                   = var.public_subnet_id
   vpc_security_group_ids      = [var.security_group_id]
   associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
   # Root volume
   root_block_device {
@@ -132,4 +133,11 @@ resource "aws_iam_role_policy_attachment" "ssm" {
 resource "aws_iam_instance_profile" "ec2" {
   name = "${var.project_name}-${var.environment}-ec2-profile"
   role = aws_iam_role.ec2.name
+}
+
+# Allow EC2 to pull from ECR (if policy ARN is provided)
+resource "aws_iam_role_policy_attachment" "ecr_pull" {
+  count      = var.ecr_pull_policy_arn != "" ? 1 : 0
+  role       = aws_iam_role.ec2.name
+  policy_arn = var.ecr_pull_policy_arn
 }

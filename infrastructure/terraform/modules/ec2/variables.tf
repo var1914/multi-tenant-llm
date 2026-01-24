@@ -82,3 +82,9 @@ variable "domain_name" {
   type        = string
   default     = ""
 }
+
+variable "ecr_pull_policy_arn" {
+  description = "ARN of the ECR pull policy"
+  type        = string
+  default     = ""
+}

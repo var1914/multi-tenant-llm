@@ -97,6 +97,16 @@ module "security" {
 }
 
 # =============================================================================
+# ECR MODULE (Container Registry)
+# =============================================================================
+module "ecr" {
+  source = "./modules/ecr"
+
+  project_name = var.project_name
+  environment  = var.environment
+}
+
+# =============================================================================
 # RDS MODULE (PostgreSQL in Private Subnet)
 # =============================================================================
 module "rds" {
@@ -149,6 +159,9 @@ module "ec2" {
 
   # Optional: Domain for SSL
   domain_name = var.domain_name
+
+  # ECR access for pulling container images
+  ecr_pull_policy_arn = module.ecr.ecr_pull_policy_arn
 }
 
 # =============================================================================
@@ -236,4 +249,20 @@ output "internal_api_key" {
   description = "Internal API Key (store securely!)"
   value       = random_password.internal_api_key.result
   sensitive   = true
+}
+
+# ECR Outputs
+output "ecr_api_repository_url" {
+  description = "ECR API repository URL"
+  value       = module.ecr.api_repository_url
+}
+
+output "ecr_frontend_repository_url" {
+  description = "ECR Frontend repository URL"
+  value       = module.ecr.frontend_repository_url
+}
+
+output "ecr_registry_id" {
+  description = "ECR registry ID (AWS account ID)"
+  value       = module.ecr.registry_id
 }

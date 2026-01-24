@@ -1,0 +1,179 @@
+# =============================================================================
+# TokenTrail Local Build Docker Compose
+# Builds images locally instead of pulling from ECR
+# Use for development or when ECR is not available
+# =============================================================================
+
+services:
+  # Redis Cache (runs locally on EC2)
+  redis:
+    image: redis:7-alpine
+    container_name: tokentrail-redis
+    restart: always
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - tokentrail-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # FastAPI Backend (build locally)
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: tokentrail-api:latest
+    container_name: tokentrail-api
+    restart: always
+    command: >
+      gunicorn app.main:app
+      --workers ${API_WORKERS:-2}
+      --worker-class uvicorn.workers.UvicornWorker
+      --bind 0.0.0.0:8000
+      --timeout 120
+      --keep-alive 5
+      --max-requests 10000
+      --max-requests-jitter 1000
+      --access-logfile -
+      --error-logfile -
+      --capture-output
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - LITELLM_PROXY_URL=http://litellm:4000
+      - ENVIRONMENT=production
+      - DEBUG=false
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - tokentrail-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # LiteLLM Proxy
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: tokentrail-litellm
+    restart: always
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DISABLE_SPEND_LOGS=true
+      - STORE_MODEL_IN_DB=false
+      - LITELLM_DROP_PARAMS=true
+      - DATABASE_URL=${LITELLM_DATABASE_URL:-${SYNC_DATABASE_URL}}
+      - LITELLM_CALLBACKS=tokentrail_callback.TokenTrailCallback
+      - TOKENTRAIL_API_URL=http://api:8000
+      - TOKENTRAIL_INTERNAL_API_KEY=${USAGEFLOW_INTERNAL_API_KEY}
+      - TOKENTRAIL_CALLBACK_ENABLED=true
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml:ro
+      - ./litellm/tokentrail_callback.py:/app/tokentrail_callback.py:ro
+    command: --config /app/config.yaml
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - tokentrail-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # Frontend + Nginx (build locally)
+  nginx:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://tokentrailapp.com
+    image: tokentrail-frontend:latest
+    container_name: tokentrail-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - api
+      - litellm
+    networks:
+      - tokentrail-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+  # Health Monitor
+  healthcheck-monitor:
+    image: alpine:latest
+    container_name: tokentrail-monitor
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./scripts/health-monitor.sh:/health-monitor.sh:ro
+    command: /bin/sh /health-monitor.sh
+    environment:
+      - ALERT_EMAIL=${ALERT_EMAIL:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - CHECK_INTERVAL=60
+    depends_on:
+      - api
+      - litellm
+      - redis
+    networks:
+      - tokentrail-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "2"
+
+volumes:
+  redis_data:
+
+networks:
+  tokentrail-network:
+    driver: bridge
