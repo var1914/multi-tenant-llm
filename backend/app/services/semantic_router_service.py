@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 # Flag to check if semantic_router is available
 SEMANTIC_ROUTER_AVAILABLE = False
+Route = None
+HuggingFaceEncoder = None
+SemanticRouter = None
 
 try:
     from semantic_router import Route
@@ -21,6 +24,9 @@ try:
     SEMANTIC_ROUTER_AVAILABLE = True
 except ImportError:
     logger.warning("semantic-router not installed. Using fallback classification.")
+except Exception as e:
+    # Python 3.12 has compatibility issues with semantic-router's Pydantic v1 usage
+    logger.warning(f"semantic-router failed to load (Python 3.12 compatibility): {e}")
 
 
 # Task categories with example utterances for embedding-based classification
