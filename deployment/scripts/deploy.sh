@@ -63,8 +63,8 @@ copy_files() {
     sudo chown -R ubuntu:ubuntu $DEPLOY_DIR
 
     # Copy deployment configs
-    cp "$REPO_ROOT/deployment/docker compose.prod.yml" "$DEPLOY_DIR/"
-    cp "$REPO_ROOT/deployment/docker compose.logging.yml" "$DEPLOY_DIR/" 2>/dev/null || true
+    cp "$REPO_ROOT/deployment/docker-compose.prod.yml" "$DEPLOY_DIR/"
+    cp "$REPO_ROOT/deployment/docker-compose.logging.yml" "$DEPLOY_DIR/" 2>/dev/null || true
     cp "$REPO_ROOT/deployment/litellm_config.yaml" "$DEPLOY_DIR/"
     cp "$REPO_ROOT/deployment/tokentrail.service" "$DEPLOY_DIR/"
     cp "$REPO_ROOT/deployment/tokentrail-watchdog.service" "$DEPLOY_DIR/"
@@ -108,7 +108,7 @@ build_images() {
     log_info "Building Docker images..."
     cd "$DEPLOY_DIR"
 
-    docker compose -f docker compose.prod.yml build
+    docker compose -f docker-compose.prod.yml build
     log_info "Docker images built successfully (frontend built inside container)"
 }
 
@@ -117,7 +117,7 @@ run_migrations() {
     log_info "Running database migrations..."
     cd "$DEPLOY_DIR"
 
-    docker compose -f docker compose.prod.yml run --rm api alembic upgrade head
+    docker compose -f docker-compose.prod.yml run --rm api alembic upgrade head
     log_info "Migrations completed"
 }
 
@@ -127,10 +127,10 @@ deploy_services() {
     cd "$DEPLOY_DIR"
 
     # Stop existing services
-    docker compose -f docker compose.prod.yml down --remove-orphans || true
+    docker compose -f docker-compose.prod.yml down --remove-orphans || true
 
     # Start services
-    docker compose -f docker compose.prod.yml up -d
+    docker compose -f docker-compose.prod.yml up -d
 
     log_info "Services deployed"
 }
@@ -169,12 +169,12 @@ health_check() {
 
     if [ $attempt -gt $max_attempts ]; then
         log_error "API health check failed after $max_attempts attempts"
-        docker compose -f docker compose.prod.yml logs --tail=50 api
+        docker compose -f docker-compose.prod.yml logs --tail=50 api
         exit 1
     fi
 
     log_info "Container status:"
-    docker compose -f docker compose.prod.yml ps
+    docker compose -f docker-compose.prod.yml ps
 }
 
 # ECR Login
@@ -217,7 +217,7 @@ ecr_pull() {
 
     log_info "Pulling images (version: ${IMAGE_TAG})..."
     cd "$DEPLOY_DIR"
-    docker compose -f docker compose.prod.yml pull
+    docker compose -f docker-compose.prod.yml pull
 
     # Save deployed version
     echo "${IMAGE_TAG}" > "$VERSION_FILE"
@@ -251,7 +251,7 @@ print_summary() {
     echo ""
     echo "Services running:"
     cd "$DEPLOY_DIR"
-    docker compose -f docker compose.prod.yml ps
+    docker compose -f docker-compose.prod.yml ps
     echo ""
     echo "Access your application:"
     echo "  - Frontend: http://$public_ip"
@@ -260,7 +260,7 @@ print_summary() {
     echo "  - LiteLLM: http://$public_ip:4000"
     echo ""
     echo "Useful commands:"
-    echo "  - View logs: cd $DEPLOY_DIR && docker compose -f docker compose.prod.yml logs -f"
+    echo "  - View logs: cd $DEPLOY_DIR && docker compose -f docker-compose.prod.yml logs -f"
     echo "  - Restart: sudo systemctl restart tokentrail"
     echo "  - Status: sudo systemctl status tokentrail"
     echo ""
@@ -311,12 +311,12 @@ case "${1:-deploy}" in
         ;;
     status)
         cd "$DEPLOY_DIR"
-        docker compose -f docker compose.prod.yml ps
-        docker compose -f docker compose.prod.yml logs --tail=20
+        docker compose -f docker-compose.prod.yml ps
+        docker compose -f docker-compose.prod.yml logs --tail=20
         ;;
     logs)
         cd "$DEPLOY_DIR"
-        docker compose -f docker compose.prod.yml logs -f "${2:-}"
+        docker compose -f docker-compose.prod.yml logs -f "${2:-}"
         ;;
     version)
         if [ -f "$VERSION_FILE" ]; then

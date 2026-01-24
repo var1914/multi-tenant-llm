@@ -83,8 +83,8 @@ resource "aws_ecr_lifecycle_policy" "frontend_cleanup" {
   })
 }
 
-# IAM policy for EC2 to pull from ECR
-data "aws_iam_policy_document" "ecr_pull" {
+# IAM policy for EC2 to pull AND push to ECR
+data "aws_iam_policy_document" "ecr_access" {
   statement {
     effect = "Allow"
     actions = [
@@ -96,9 +96,15 @@ data "aws_iam_policy_document" "ecr_pull" {
   statement {
     effect = "Allow"
     actions = [
+      # Pull permissions
       "ecr:BatchCheckLayerAvailability",
       "ecr:GetDownloadUrlForLayer",
       "ecr:BatchGetImage",
+      # Push permissions
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload",
+      "ecr:PutImage",
     ]
     resources = [
       aws_ecr_repository.api.arn,
@@ -110,5 +116,5 @@ data "aws_iam_policy_document" "ecr_pull" {
 resource "aws_iam_policy" "ecr_pull" {
   name        = "${var.project_name}-${var.environment}-ecr-pull"
   description = "Allow pulling images from ECR"
-  policy      = data.aws_iam_policy_document.ecr_pull.json
+  policy      = data.aws_iam_policy_document.ecr_access.json
 }
