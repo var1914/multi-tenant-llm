@@ -36,7 +36,7 @@ resource "aws_instance" "main" {
   # Root volume
   root_block_device {
     volume_type           = "gp3"
-    volume_size           = 30  # GB
+    volume_size           = 50  # GB - increased for Docker images with ML libraries
     delete_on_termination = true
     encrypted             = true
 

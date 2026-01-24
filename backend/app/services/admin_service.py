@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
 from app.models.tenant import Tenant
 from app.models.end_customer import EndCustomer
-from app.models.api_key import APIKey
+from app.models.api_key import ApiKey
 from app.models.usage_event import UsageEvent
 
 
@@ -54,11 +54,11 @@ class AdminService:
 
         # Total API keys
         total_api_keys = await self.db.scalar(
-            select(func.count(APIKey.id))
+            select(func.count(ApiKey.id))
         )
 
         active_api_keys = await self.db.scalar(
-            select(func.count(APIKey.id)).where(APIKey.is_active == True)
+            select(func.count(ApiKey.id)).where(ApiKey.is_active == True)
         )
 
         # Total usage events
