@@ -255,16 +255,32 @@ async def test_routing(
     # Get routing decision (but don't record in test mode)
     strategy = ROUTING_STRATEGIES.get(tenant.routing_strategy, ROUTING_STRATEGIES["balanced"])
     threshold = strategy["complexity_threshold"]
+    use_task_routing = strategy.get("use_task_routing", False)
 
     provider = router_service.get_provider_for_model(request.model)
+    task_type = task_info.get("task_type", "simple")
 
     routed_model = request.model
     routing_applied = False
-    task_str = f"[{task_info.get('task_type', 'unknown')}] " if task_info.get("task_type") else ""
+    task_str = f"[{task_type}] " if task_type else ""
     routing_reason = f"{task_str}Complexity ({complexity_score:.2f}) above threshold ({threshold})"
     estimated_savings = 0.0
 
-    if complexity_score < threshold:
+    # Task-optimized routing: select best model for the task type
+    if use_task_routing and task_type:
+        available_models = list(MODEL_COSTS.keys())
+        recommended_model, reason = router_service.get_task_optimized_model(task_type, available_models)
+
+        if recommended_model and recommended_model.lower() != request.model.lower():
+            routed_model = recommended_model
+            routing_applied = True
+            routing_reason = f"{task_str}Task-optimized: {reason}"
+            estimated_savings = float(router_service.estimate_savings(request.model, recommended_model))
+        else:
+            routing_reason = f"{task_str}Already using optimal model for task"
+
+    # Complexity-based routing (fallback when not using task routing)
+    elif complexity_score < threshold:
         alternative = router_service.get_alternative_model(request.model, provider, to_premium=False)
         if alternative and alternative.lower() != request.model.lower():
             routed_model = alternative
