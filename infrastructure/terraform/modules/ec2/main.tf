@@ -74,7 +74,8 @@ resource "aws_instance" "main" {
   }
 
   lifecycle {
-    ignore_changes = [ami, user_data]  # Don't recreate on AMI updates
+    # Don't recreate on AMI updates or when stopped (public IP gets released)
+    ignore_changes = [ami, user_data, associate_public_ip_address]
   }
 }
 
@@ -140,4 +141,76 @@ resource "aws_iam_role_policy_attachment" "ecr_pull" {
   count      = var.ecr_pull_policy_arn != "" ? 1 : 0
   role       = aws_iam_role.ec2.name
   policy_arn = var.ecr_pull_policy_arn
+}
+
+# =============================================================================
+# AUTO-STOP SCHEDULER (Stop EC2 at 12:00 AM IST / 6:30 PM UTC daily)
+# =============================================================================
+
+# IAM role for EventBridge to stop EC2 instances
+resource "aws_iam_role" "scheduler" {
+  name = "${var.project_name}-${var.environment}-ec2-scheduler"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "scheduler.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-ec2-scheduler"
+  }
+}
+
+# Policy to allow stopping the EC2 instance
+resource "aws_iam_role_policy" "scheduler_ec2_stop" {
+  name = "ec2-stop-policy"
+  role = aws_iam_role.scheduler.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "ec2:StopInstances"
+        Resource = aws_instance.main.arn
+      }
+    ]
+  })
+}
+
+# EventBridge Scheduler to stop EC2 at 12:00 AM IST (6:30 PM UTC) daily
+resource "aws_scheduler_schedule" "stop_ec2" {
+  name        = "${var.project_name}-${var.environment}-stop-ec2-midnight-ist"
+  description = "Stop EC2 instance at 12:00 AM IST daily to save costs"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  # 12:00 AM IST daily
+  schedule_expression          = "cron(0 0 * * ? *)"
+  schedule_expression_timezone = "Asia/Kolkata"
+
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:ec2:stopInstances"
+    role_arn = aws_iam_role.scheduler.arn
+
+    input = jsonencode({
+      InstanceIds = [aws_instance.main.id]
+    })
+
+    # Retry on transient failures, don't fail if already stopped
+    retry_policy {
+      maximum_event_age_in_seconds = 300
+      maximum_retry_attempts       = 3
+    }
+  }
 }

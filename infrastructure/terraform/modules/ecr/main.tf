@@ -40,7 +40,7 @@ resource "aws_ecr_repository" "frontend" {
   }
 }
 
-# Lifecycle policy to clean up old images (keep last 10)
+# Lifecycle policy to clean up old images (keep only 1 to save costs)
 resource "aws_ecr_lifecycle_policy" "api_cleanup" {
   repository = aws_ecr_repository.api.name
 
@@ -48,11 +48,11 @@ resource "aws_ecr_lifecycle_policy" "api_cleanup" {
     rules = [
       {
         rulePriority = 1
-        description  = "Keep last 10 images"
+        description  = "Keep only latest image"
         selection = {
           tagStatus     = "any"
           countType     = "imageCountMoreThan"
-          countNumber   = 10
+          countNumber   = 1
         }
         action = {
           type = "expire"
@@ -69,11 +69,11 @@ resource "aws_ecr_lifecycle_policy" "frontend_cleanup" {
     rules = [
       {
         rulePriority = 1
-        description  = "Keep last 10 images"
+        description  = "Keep only latest image"
         selection = {
           tagStatus     = "any"
           countType     = "imageCountMoreThan"
-          countNumber   = 10
+          countNumber   = 1
         }
         action = {
           type = "expire"

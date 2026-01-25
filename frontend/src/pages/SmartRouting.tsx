@@ -430,17 +430,11 @@ export default function SmartRouting() {
   // Update settings mutation
   const updateSettingsMutation = useMutation({
     mutationFn: async (newSettings: Partial<RoutingSettings>) => {
-      console.log('Updating settings:', newSettings)
       const response = await apiClient.put('/routing/settings', newSettings)
       return response.data
     },
-    onSuccess: (data) => {
-      console.log('Settings updated successfully:', data)
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['routing-settings'] })
-    },
-    onError: (error) => {
-      console.error('Failed to update settings:', error)
-      alert('Failed to update routing settings. Check console for details.')
     },
   })
 
@@ -510,17 +504,14 @@ export default function SmartRouting() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Routing Strategy</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {settings?.available_strategies && Object.entries(settings.available_strategies).map(([key, value]) => {
                   const strategy = value as { description?: string; complexity_threshold?: number }
                   return (
                     <button
                       key={key}
                       type="button"
-                      onClick={() => {
-                        console.log('Clicking strategy:', key)
-                        updateSettingsMutation.mutate({ routing_strategy: key })
-                      }}
+                      onClick={() => updateSettingsMutation.mutate({ routing_strategy: key })}
                       className={clsx(
                         'p-4 rounded-lg border-2 text-left transition-colors cursor-pointer',
                         settings.routing_strategy === key

@@ -103,27 +103,15 @@ MODEL_COSTS = {
     "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
 }
 
-# Routing strategies
+# Routing strategies (simplified to 2 clear options)
 ROUTING_STRATEGIES = {
     "cost_optimized": {
-        "description": "Aggressively route simple tasks to cheaper models",
+        "description": "Save money - route simple queries to cheaper models",
         "complexity_threshold": 0.5,
-        "use_task_routing": False,
-    },
-    "balanced": {
-        "description": "Balance between cost and quality",
-        "complexity_threshold": 0.35,
-        "use_task_routing": False,
     },
     "quality_first": {
-        "description": "Only route very simple tasks to cheaper models",
+        "description": "Best results - only route very simple queries",
         "complexity_threshold": 0.2,
-        "use_task_routing": False,
-    },
-    "task_optimized": {
-        "description": "Select best model based on task type (coding→Claude, etc.)",
-        "complexity_threshold": 0.35,
-        "use_task_routing": True,
     },
 }
 
@@ -151,6 +139,39 @@ class ComplexityAnalyzer:
         r"\byes.or.no\b", r"\btrue.or.false\b", r"\bsimple\b",
         r"\bquick\b", r"\bbrief\b", r"\bshort\b",
     ]
+
+    # Task detection keywords (for fallback when semantic router unavailable)
+    TASK_KEYWORDS = {
+        "coding": [r"\bcode\b", r"\bfunction\b", r"\bclass\b", r"\bapi\b", r"\bdebug\b",
+                   r"\bpython\b", r"\bjavascript\b", r"\btypescript\b", r"\bsql\b",
+                   r"\bimplement\b", r"\brefactor\b", r"\bwrite.*script\b", r"```"],
+        "analysis": [r"\banalyze\b", r"\bcompare\b", r"\bevaluate\b", r"\bpros.and.cons\b",
+                     r"\btradeoff\b", r"\breview\b", r"\bassess\b", r"\bcritique\b"],
+        "reasoning": [r"\bstep.by.step\b", r"\breason\b", r"\bprove\b", r"\bderive\b",
+                      r"\bexplain.*why\b", r"\blogic\b", r"\bmath\b", r"\bcalculate\b"],
+        "creative": [r"\bstory\b", r"\bpoem\b", r"\bbrainstorm\b", r"\bcreative\b",
+                     r"\bimagine\b", r"\bblog\b", r"\bmarketing\b", r"\btagline\b"],
+        "translation": [r"\btranslate\b", r"\bspanish\b", r"\bfrench\b", r"\bgerman\b",
+                        r"\bchinese\b", r"\bjapanese\b", r"\bkorean\b", r"\blanguage\b"],
+        "summarization": [r"\bsummarize\b", r"\bsummary\b", r"\btldr\b", r"\bkey.points\b",
+                          r"\bcondense\b", r"\bbrief\b", r"\boverview\b"],
+        "extraction": [r"\bextract\b", r"\bpull.out\b", r"\bfind.all\b", r"\blist.the\b",
+                       r"\bidentify\b", r"\bparse\b"],
+    }
+
+    @classmethod
+    def _detect_task_from_keywords(cls, text_lower: str) -> str:
+        """Detect task type from keywords when semantic router is unavailable."""
+        best_task = "simple"
+        best_score = 0
+
+        for task, patterns in cls.TASK_KEYWORDS.items():
+            matches = sum(1 for p in patterns if re.search(p, text_lower))
+            if matches > best_score:
+                best_score = matches
+                best_task = task
+
+        return best_task
 
     @classmethod
     def analyze(
@@ -208,7 +229,15 @@ class ComplexityAnalyzer:
             except Exception as e:
                 logger.warning(f"Semantic classification failed: {e}")
 
-        # STEP 2: Keyword-based heuristics (supplement/fallback)
+        # STEP 2: Keyword-based task detection (fallback when semantic not available)
+        if task_info["task_type"] is None:
+            detected_task = cls._detect_task_from_keywords(text_lower)
+            task_info["task_type"] = detected_task
+            task_info["task_confidence"] = 0.6  # Lower confidence for keyword-based
+            if detected_task != "simple":
+                reasons.append(f"Task: {detected_task} (keyword)")
+
+        # STEP 3: Keyword-based complexity heuristics
         complex_count = sum(1 for pattern in cls.COMPLEX_KEYWORDS if re.search(pattern, text_lower))
         if complex_count > 0:
             complexity_boost = min(0.2, complex_count * 0.05)  # Reduced weight when semantic is used
@@ -221,7 +250,7 @@ class ComplexityAnalyzer:
             score -= simplicity_reduction
             reasons.append(f"Simple keywords ({simple_count})")
 
-        # STEP 3: Structural heuristics
+        # STEP 4: Structural heuristics
         word_count = len(text_content.split())
         if word_count < 50:
             score -= 0.05
@@ -392,7 +421,7 @@ class SmartRouter:
             return result
 
         # Get routing strategy settings
-        strategy = ROUTING_STRATEGIES.get(tenant.routing_strategy, ROUTING_STRATEGIES["balanced"])
+        strategy = ROUTING_STRATEGIES.get(tenant.routing_strategy, ROUTING_STRATEGIES["cost_optimized"])
         threshold = strategy["complexity_threshold"]
 
         # Analyze complexity with semantic classification
@@ -410,22 +439,8 @@ class SmartRouter:
         task_type = task_info.get("task_type", "simple")
         task_str = f"[{task_type}] " if task_type else ""
 
-        # Task-optimized routing: select best model for the task type
-        if strategy.get("use_task_routing", False) and task_type:
-            # Get all configured models (from MODEL_COSTS as proxy for available models)
-            available_models = list(MODEL_COSTS.keys())
-            recommended_model, reason = self.get_task_optimized_model(task_type, available_models)
-
-            if recommended_model and recommended_model.lower() != original_model.lower():
-                result["routed_model"] = recommended_model
-                result["routing_applied"] = True
-                result["routing_reason"] = f"{task_str}Task-optimized: {reason}"
-                result["estimated_savings_usd"] = self.estimate_savings(original_model, recommended_model)
-            else:
-                result["routing_reason"] = f"{task_str}Already using optimal model for task"
-
-        # Complexity-based routing (cost optimization)
-        elif complexity_score < threshold:
+        # Complexity-based routing: route to cheaper model when complexity is low
+        if complexity_score < threshold:
             alternative = self.get_alternative_model(original_model, provider, to_premium=False)
             if alternative and alternative.lower() != original_model.lower():
                 result["routed_model"] = alternative
