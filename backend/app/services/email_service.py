@@ -167,9 +167,9 @@ Approve at: {settings.FRONTEND_URL}/app/admin
                     <p>Hi {full_name},</p>
                     <p>Great news! Your trial request has been approved.</p>
                     <div class="highlight">
-                        <h2>$5 Trial Credits Added</h2>
+                        <h2>$5 Trial Credits Waiting</h2>
                     </div>
-                    <p>You now have access to all TokenTrail features with $5 in trial credits to explore:</p>
+                    <p>Create your account to unlock $5 in trial credits and explore all TokenTrail features:</p>
                     <ul>
                         <li>Multi-tenant LLM usage tracking</li>
                         <li>Smart model routing for cost optimization</li>
@@ -180,7 +180,7 @@ Approve at: {settings.FRONTEND_URL}/app/admin
                     <div class="cta">
                         <a href="{settings.FRONTEND_URL}/register">Create Your Account</a>
                     </div>
-                    <p>Use the same email ({email}) when registering to automatically receive your credits.</p>
+                    <p>Register with this email ({email}) to automatically receive your $5 credits.</p>
                     <div class="footer">
                         <p>Questions? Reply to this email or reach out at support@tokentrail.dev</p>
                         <p>Happy building!</p>
@@ -196,7 +196,7 @@ Hi {full_name},
 
 Great news! Your TokenTrail trial request has been approved.
 
-You now have $5 in trial credits to explore all TokenTrail features:
+Create your account to unlock $5 in trial credits and explore all features:
 - Multi-tenant LLM usage tracking
 - Smart model routing for cost optimization
 - Real-time dashboards and analytics
@@ -205,7 +205,7 @@ You now have $5 in trial credits to explore all TokenTrail features:
 
 Create your account: {settings.FRONTEND_URL}/register
 
-Use the same email ({email}) when registering to automatically receive your credits.
+Register with this email ({email}) to automatically receive your $5 credits.
 
 Questions? Reply to this email.
 
