@@ -199,12 +199,12 @@ class AdminService:
         """Get usage breakdown by model."""
         result = await self.db.execute(
             select(
-                UsageEvent.model_name,
+                UsageEvent.model,
                 func.count(UsageEvent.id).label('event_count'),
                 func.coalesce(func.sum(UsageEvent.quantity), 0).label('total_tokens'),
                 func.coalesce(func.sum(UsageEvent.cost_usd), 0).label('total_cost')
             )
-            .group_by(UsageEvent.model_name)
+            .group_by(UsageEvent.model)
             .order_by(func.coalesce(func.sum(UsageEvent.cost_usd), 0).desc())
             .limit(20)
         )
@@ -212,7 +212,7 @@ class AdminService:
         rows = result.all()
         return [
             {
-                "model": row.model_name,
+                "model": row.model or "unknown",
                 "event_count": row.event_count,
                 "total_tokens": int(row.total_tokens),
                 "total_cost_usd": float(row.total_cost),
