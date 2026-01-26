@@ -24,7 +24,12 @@ class TrialRequest(Base, UUIDMixin, TimestampMixin):
     company_name = Column(String(255), nullable=True)
     use_case = Column(Text, nullable=False)  # "What are you building?"
     status = Column(
-        SQLEnum(TrialRequestStatus),
+        SQLEnum(
+            TrialRequestStatus,
+            values_callable=lambda x: [e.value for e in x],
+            create_type=False,  # Don't try to create the type, it already exists
+            name='trialrequeststatus'
+        ),
         default=TrialRequestStatus.PENDING,
         nullable=False,
         index=True

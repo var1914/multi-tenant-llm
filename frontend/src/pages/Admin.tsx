@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   LineChart,
@@ -16,6 +17,7 @@ import {
 } from 'recharts'
 import apiClient from '../api/client'
 import toast from 'react-hot-toast'
+import { useAuthStore } from '../stores/authStore'
 
 interface PlatformStats {
   users: { total: number; active_7d: number; active_30d: number }
@@ -62,6 +64,16 @@ export default function Admin() {
   const [userSearch, setUserSearch] = useState('')
   const [trialStatusFilter, setTrialStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending')
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const { user } = useAuthStore()
+
+  // Redirect non-admin users
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      toast.error('Access denied. Admin privileges required.')
+      navigate('/app/dashboard')
+    }
+  }, [user, navigate])
 
   // Fetch platform stats
   const { data: stats, isLoading: statsLoading } = useQuery<PlatformStats>({
@@ -203,6 +215,16 @@ export default function Admin() {
       day: 'numeric',
       year: 'numeric',
     })
+  }
+
+  // Block non-admin users
+  if (user && user.role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <div className="text-red-500 text-lg font-semibold">Access Denied</div>
+        <p className="text-gray-500">You don't have permission to access this page.</p>
+      </div>
+    )
   }
 
   if (statsLoading) {

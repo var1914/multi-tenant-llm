@@ -207,10 +207,10 @@ function SmartRoutingVisualizer() {
 // Dashboard Preview - shows per-customer billing visibility
 function DashboardPreview() {
   const customers = [
-    { name: 'Acme Corp', tokens: '2.4M', cost: '$127.50', budget: '$150', status: 'warning', percent: 85 },
-    { name: 'TechStart Inc', tokens: '890K', cost: '$45.20', budget: '$100', status: 'healthy', percent: 45 },
-    { name: 'DataFlow AI', tokens: '3.1M', cost: '$165.00', budget: '$150', status: 'blocked', percent: 110 },
-    { name: 'CloudNine', tokens: '1.2M', cost: '$62.40', budget: '$200', status: 'healthy', percent: 31 },
+    { name: 'alice_dev', tokens: '2.4M', cost: '$127.50', budget: '$150', status: 'warning', percent: 85 },
+    { name: 'bob_prod', tokens: '890K', cost: '$45.20', budget: '$100', status: 'healthy', percent: 45 },
+    { name: 'charlie_test', tokens: '3.1M', cost: '$165.00', budget: '$150', status: 'blocked', percent: 110 },
+    { name: 'diana_api', tokens: '1.2M', cost: '$62.40', budget: '$200', status: 'healthy', percent: 31 },
   ]
 
   const statusColors = {
