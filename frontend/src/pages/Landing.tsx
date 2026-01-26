@@ -4,8 +4,10 @@ import {
   ArrowRightIcon,
   CheckIcon,
   PlayIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline'
 import PricingCalculator from '../components/landing/PricingCalculator'
+import TrialRequestModal from '../components/landing/TrialRequestModal'
 
 // TokenTrail Logo Component
 function TokenTrailLogo({ className = "w-8 h-8" }: { className?: string }) {
@@ -668,10 +670,36 @@ function Pricing() {
 
 // Main Landing Page
 export default function Landing() {
+  const [isTrialModalOpen, setIsTrialModalOpen] = useState(false)
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
+      {/* Trial Request Modal */}
+      <TrialRequestModal
+        isOpen={isTrialModalOpen}
+        onClose={() => setIsTrialModalOpen(false)}
+      />
+
+      {/* MVP Banner */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border-b border-amber-500/20">
+        <div className="max-w-6xl mx-auto px-6 py-2 flex items-center justify-center gap-3">
+          <SparklesIcon className="w-4 h-4 text-amber-400" />
+          <span className="text-sm text-amber-200">
+            <span className="font-semibold">MVP Preview</span>
+            <span className="text-amber-300/70 mx-2">|</span>
+            Request $5 trial credits to explore all features
+          </span>
+          <button
+            onClick={() => setIsTrialModalOpen(true)}
+            className="ml-2 px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-medium rounded-full border border-amber-500/30 transition-colors"
+          >
+            Request Trial
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation - adjusted for MVP banner */}
+      <nav className="fixed top-10 left-0 right-0 z-50 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800">
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2">
@@ -698,26 +726,26 @@ export default function Landing() {
               <Link to="/login" className="text-zinc-400 hover:text-white text-sm transition-colors">
                 Sign in
               </Link>
-              <Link
-                to="/register"
+              <button
+                onClick={() => setIsTrialModalOpen(true)}
                 className="px-4 py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-zinc-200 transition-colors"
               >
-                Get Started
-              </Link>
+                Get Trial Credits
+              </button>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="pt-32 pb-20 px-6">
+      {/* Hero - adjusted padding for MVP banner + nav */}
+      <section className="pt-44 pb-20 px-6">
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left: Copy */}
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full text-green-400 text-sm mb-6">
-                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                Now in public beta
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400 text-sm mb-6">
+                <SparklesIcon className="w-4 h-4" />
+                MVP Preview - Request trial credits
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
@@ -732,13 +760,14 @@ export default function Landing() {
               </p>
 
               <div className="flex flex-wrap gap-4 mb-8">
-                <Link
-                  to="/register"
-                  className="group inline-flex items-center gap-2 px-6 py-3 bg-white text-black rounded-lg font-semibold hover:bg-zinc-200 transition-colors"
+                <button
+                  onClick={() => setIsTrialModalOpen(true)}
+                  className="group inline-flex items-center gap-2 px-6 py-3 bg-green-500 text-black rounded-lg font-semibold hover:bg-green-400 transition-colors"
                 >
-                  Start Free
+                  <SparklesIcon className="w-4 h-4" />
+                  Request $5 Trial
                   <ArrowRightIcon className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                </Link>
+                </button>
                 <a
                   href="#how-it-works"
                   className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-lg font-semibold border border-zinc-800 hover:bg-zinc-800 transition-colors"
@@ -784,20 +813,25 @@ export default function Landing() {
       {/* Final CTA */}
       <section className="py-24 bg-black">
         <div className="max-w-3xl mx-auto px-6 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400 text-sm mb-6">
+            <SparklesIcon className="w-4 h-4" />
+            MVP Preview - Limited spots available
+          </div>
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Start billing for AI today.
           </h2>
           <p className="text-zinc-400 text-lg mb-8">
             Know what each customer costs. Set limits. Never get a surprise bill again.
           </p>
-          <Link
-            to="/register"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-black rounded-lg font-semibold text-lg hover:bg-zinc-200 transition-colors"
+          <button
+            onClick={() => setIsTrialModalOpen(true)}
+            className="inline-flex items-center gap-2 px-8 py-4 bg-green-500 text-black rounded-lg font-semibold text-lg hover:bg-green-400 transition-colors"
           >
-            Get Started Free
+            <SparklesIcon className="w-5 h-5" />
+            Request $5 Trial Credits
             <ArrowRightIcon className="w-5 h-5" />
-          </Link>
-          <p className="text-zinc-600 text-sm mt-4">No credit card required</p>
+          </button>
+          <p className="text-zinc-600 text-sm mt-4">We'll review your request within 24 hours</p>
         </div>
       </section>
 

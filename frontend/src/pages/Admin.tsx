@@ -36,11 +36,31 @@ interface User {
   last_login_at: string | null
 }
 
+interface TrialRequest {
+  id: string
+  email: string
+  full_name: string
+  company_name: string | null
+  use_case: string
+  status: 'pending' | 'approved' | 'rejected'
+  admin_notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+interface TrialStats {
+  total: number
+  pending: number
+  approved: number
+  rejected: number
+}
+
 const CHART_COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
 
 export default function Admin() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'trials'>('overview')
   const [userSearch, setUserSearch] = useState('')
+  const [trialStatusFilter, setTrialStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending')
   const queryClient = useQueryClient()
 
   // Fetch platform stats
@@ -109,6 +129,27 @@ export default function Admin() {
     enabled: activeTab === 'users',
   })
 
+  // Fetch trial stats
+  const { data: trialStats } = useQuery<TrialStats>({
+    queryKey: ['admin-trial-stats'],
+    queryFn: async () => {
+      const response = await apiClient.get('/trial/admin/stats')
+      return response.data
+    },
+  })
+
+  // Fetch trial requests (for trials tab)
+  const { data: trialRequestsData, isLoading: trialsLoading } = useQuery({
+    queryKey: ['admin-trial-requests', trialStatusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ limit: '50' })
+      if (trialStatusFilter !== 'all') params.append('status', trialStatusFilter)
+      const response = await apiClient.get(`/trial/admin/requests?${params}`)
+      return response.data
+    },
+    enabled: activeTab === 'trials',
+  })
+
   // Update user mutation
   const updateUserMutation = useMutation({
     mutationFn: async ({ userId, data }: { userId: string; data: { is_active?: boolean; role?: string } }) => {
@@ -123,6 +164,25 @@ export default function Admin() {
     },
     onError: () => {
       toast.error('Failed to update user')
+    },
+  })
+
+  // Process trial request mutation
+  const processTrialMutation = useMutation({
+    mutationFn: async ({ requestId, action, adminNotes }: { requestId: string; action: 'approve' | 'reject'; adminNotes?: string }) => {
+      const response = await apiClient.post(`/trial/admin/requests/${requestId}/action`, {
+        action,
+        admin_notes: adminNotes,
+      })
+      return response.data
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['admin-trial-requests'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-trial-stats'] })
+      toast.success(`Trial request ${variables.action}d successfully`)
+    },
+    onError: () => {
+      toast.error('Failed to process trial request')
     },
   })
 
@@ -171,6 +231,21 @@ export default function Admin() {
             }`}
           >
             Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('trials')}
+            className={`px-4 py-2 rounded-lg font-medium text-sm relative ${
+              activeTab === 'trials'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Trials
+            {(trialStats?.pending ?? 0) > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                {trialStats?.pending}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -386,6 +461,141 @@ export default function Admin() {
             </div>
           </div>
         </>
+      ) : activeTab === 'trials' ? (
+        /* Trials Tab */
+        <div className="space-y-6">
+          {/* Trial Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              title="Total Requests"
+              value={trialStats?.total || 0}
+              color="blue"
+            />
+            <StatCard
+              title="Pending"
+              value={trialStats?.pending || 0}
+              color="yellow"
+            />
+            <StatCard
+              title="Approved"
+              value={trialStats?.approved || 0}
+              color="green"
+            />
+            <StatCard
+              title="Rejected"
+              value={trialStats?.rejected || 0}
+              color="purple"
+            />
+          </div>
+
+          {/* Trial Requests Table */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Trial Requests</h3>
+              <div className="flex gap-2">
+                {(['all', 'pending', 'approved', 'rejected'] as const).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setTrialStatusFilter(status)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize ${
+                      trialStatusFilter === status
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {trialsLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {(trialRequestsData?.requests || []).map((request: TrialRequest) => (
+                  <div
+                    key={request.id}
+                    className={`p-4 rounded-lg border ${
+                      request.status === 'pending'
+                        ? 'border-amber-200 bg-amber-50'
+                        : request.status === 'approved'
+                        ? 'border-green-200 bg-green-50'
+                        : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="font-semibold text-gray-900">{request.full_name}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            request.status === 'pending'
+                              ? 'bg-amber-100 text-amber-700'
+                              : request.status === 'approved'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            {request.status}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-600 mb-1">{request.email}</div>
+                        {request.company_name && (
+                          <div className="text-sm text-gray-500 mb-2">{request.company_name}</div>
+                        )}
+                        <div className="mt-3 p-3 bg-white rounded border border-gray-200">
+                          <div className="text-xs font-medium text-gray-500 uppercase mb-1">What they're building</div>
+                          <div className="text-sm text-gray-700 whitespace-pre-wrap">{request.use_case}</div>
+                        </div>
+                        <div className="text-xs text-gray-400 mt-2">
+                          Requested: {formatDate(request.created_at)}
+                        </div>
+                      </div>
+
+                      {request.status === 'pending' && (
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => processTrialMutation.mutate({
+                              requestId: request.id,
+                              action: 'approve',
+                            })}
+                            disabled={processTrialMutation.isPending}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white text-sm font-medium rounded-lg transition-colors"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => processTrialMutation.mutate({
+                              requestId: request.id,
+                              action: 'reject',
+                            })}
+                            disabled={processTrialMutation.isPending}
+                            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {(!trialRequestsData?.requests || trialRequestsData.requests.length === 0) && (
+                  <div className="text-center py-8 text-gray-500">
+                    No {trialStatusFilter === 'all' ? '' : trialStatusFilter} trial requests found
+                  </div>
+                )}
+              </div>
+            )}
+
+            {trialRequestsData && (
+              <div className="mt-4 text-sm text-gray-500">
+                Showing {trialRequestsData.requests.length} of {trialRequestsData.total} requests
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
         /* Users Tab */
         <div className="bg-white rounded-xl border border-gray-200 p-6">

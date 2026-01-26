@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
 
+    # AWS SES Email Settings
+    AWS_REGION: str = "eu-central-1"
+    SES_SENDER_EMAIL: str = "tokentrailapp@gmail.com"
+    ADMIN_EMAIL: str = "tokentrailapp@gmail.com"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

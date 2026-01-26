@@ -13,6 +13,7 @@ from app.models.agent_workflow import AgentWorkflow
 from app.models.workflow_step import WorkflowStep
 from app.models.outcome_pricing import OutcomePricing
 from app.models.agent_efficiency import AgentEfficiency
+from app.models.trial_request import TrialRequest, TrialRequestStatus
 
 __all__ = [
     "Base",
@@ -30,4 +31,6 @@ __all__ = [
     "WorkflowStep",
     "OutcomePricing",
     "AgentEfficiency",
+    "TrialRequest",
+    "TrialRequestStatus",
 ]
