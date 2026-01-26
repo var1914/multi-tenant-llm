@@ -15,9 +15,20 @@ import Predictions from './pages/Predictions'
 import Workflows from './pages/Workflows'
 import AgentEfficiency from './pages/AgentEfficiency'
 import Admin from './pages/Admin'
+import NotFound from './pages/NotFound'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const { isAuthenticated, _hasHydrated } = useAuthStore()
+
+  // Wait for auth state to hydrate from localStorage before making auth decisions
+  if (!_hasHydrated) {
+    // Show a loading state while hydrating
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
@@ -27,7 +38,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore()
+  const { isAuthenticated, user, _hasHydrated } = useAuthStore()
+
+  // Wait for auth state to hydrate from localStorage before making auth decisions
+  if (!_hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
@@ -76,7 +96,12 @@ function App() {
             </AdminRoute>
           }
         />
+        {/* Catch-all for invalid /app/* routes */}
+        <Route path="*" element={<NotFound />} />
       </Route>
+
+      {/* Catch-all for all other invalid routes */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   )
 }
