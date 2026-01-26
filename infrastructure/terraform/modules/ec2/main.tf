@@ -57,6 +57,9 @@ resource "aws_instance" "main" {
     jwt_secret       = var.jwt_secret
     internal_api_key = var.internal_api_key
     domain_name      = var.domain_name
+    aws_region       = var.aws_region
+    ses_sender_email = var.ses_sender_email
+    admin_email      = var.admin_email
   }))
 
   # Enable detailed monitoring (optional - costs extra)

@@ -160,6 +160,11 @@ module "ec2" {
   # Optional: Domain for SSL
   domain_name = var.domain_name
 
+  # Email settings (SES)
+  aws_region       = var.aws_region
+  ses_sender_email = var.ses_sender_email
+  admin_email      = var.admin_email
+
   # ECR access for pulling container images
   ecr_pull_policy_arn = module.ecr.ecr_pull_policy_arn
 }

@@ -81,6 +81,21 @@ variable "domain_name" {
 }
 
 # =============================================================================
+# EMAIL SETTINGS (SES)
+# =============================================================================
+variable "ses_sender_email" {
+  description = "Email address for sending notifications (must be verified in SES)"
+  type        = string
+  default     = "tokentrailapp@gmail.com"
+}
+
+variable "admin_email" {
+  description = "Admin email for receiving notifications"
+  type        = string
+  default     = "tokentrailapp@gmail.com"
+}
+
+# =============================================================================
 # RDS (PostgreSQL)
 # =============================================================================
 variable "db_instance_class" {

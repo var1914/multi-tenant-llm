@@ -88,3 +88,22 @@ variable "ecr_pull_policy_arn" {
   type        = string
   default     = ""
 }
+
+# Email settings
+variable "aws_region" {
+  description = "AWS region for SES"
+  type        = string
+  default     = "eu-central-1"
+}
+
+variable "ses_sender_email" {
+  description = "Email address for sending notifications (must be verified in SES)"
+  type        = string
+  default     = "tokentrailapp@gmail.com"
+}
+
+variable "admin_email" {
+  description = "Admin email for receiving notifications"
+  type        = string
+  default     = "tokentrailapp@gmail.com"
+}

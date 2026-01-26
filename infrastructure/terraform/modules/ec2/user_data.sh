@@ -14,6 +14,9 @@ DB_PASSWORD="${db_password}"
 JWT_SECRET="${jwt_secret}"
 INTERNAL_API_KEY="${internal_api_key}"
 DOMAIN_NAME="${domain_name}"
+AWS_REGION="${aws_region}"
+SES_SENDER_EMAIL="${ses_sender_email}"
+ADMIN_EMAIL="${admin_email}"
 
 # System updates
 apt-get update -y && apt-get upgrade -y
@@ -44,6 +47,12 @@ DOMAIN_NAME=$DOMAIN_NAME
 LITELLM_MASTER_KEY=sk-change-me
 OPENAI_API_KEY=
 ANTHROPIC_API_KEY=
+
+# Email settings
+FRONTEND_URL=https://$DOMAIN_NAME
+AWS_REGION=$AWS_REGION
+SES_SENDER_EMAIL=$SES_SENDER_EMAIL
+ADMIN_EMAIL=$ADMIN_EMAIL
 EOF
 chmod 600 /opt/tokentrail/.env
 
