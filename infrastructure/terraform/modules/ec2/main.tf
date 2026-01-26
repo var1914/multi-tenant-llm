@@ -66,10 +66,11 @@ resource "aws_instance" "main" {
   monitoring = false
 
   # Metadata options (IMDSv2 for security)
+  # hop_limit = 2 allows Docker containers to access EC2 metadata for IAM credentials
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
-    http_put_response_hop_limit = 1
+    http_put_response_hop_limit = 2
   }
 
   tags = {
