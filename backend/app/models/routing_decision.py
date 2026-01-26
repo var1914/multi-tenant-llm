@@ -28,6 +28,11 @@ class RoutingDecision(Base, UUIDMixin):
     actual_tokens = Column(BigInteger, nullable=True)
     actual_cost_usd = Column(Numeric(10, 6), nullable=True)
 
+    # RouteLLM ML-based routing tracking
+    routellm_win_rate = Column(Numeric(5, 4), nullable=True)  # 0.0000 - 1.0000
+    routellm_used = Column(Boolean, default=False)
+    routellm_confident = Column(Boolean, default=False)
+
     # Request tracking
     request_id = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)

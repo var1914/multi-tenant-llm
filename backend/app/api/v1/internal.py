@@ -273,6 +273,9 @@ class RouteResponse(BaseModel):
     complexity_score: Optional[float] = None
     routing_reason: Optional[str] = None
     estimated_savings_usd: float = 0
+    # RouteLLM fields
+    routellm_win_rate: Optional[float] = None
+    routellm_used: bool = False
 
 
 @router.post("/route", response_model=RouteResponse)
@@ -284,6 +287,8 @@ async def route_request(
     """
     Get smart routing decision for a LLM request.
     Called by LiteLLM before making the actual API call.
+
+    Now includes RouteLLM ML-based prediction when enabled.
     """
     try:
         tenant_id = UUID(request.tenant_id)
@@ -302,12 +307,16 @@ async def route_request(
                 end_customer_id = customer.id
 
         router_service = SmartRouter(db)
-        result = await router_service.route_request(
+
+        # Use enhanced routing with RouteLLM
+        result = await router_service.route_request_with_routellm(
             tenant_id=tenant_id,
             original_model=request.model,
             messages=request.messages,
             end_customer_id=end_customer_id,
             request_id=request.request_id,
+            use_semantic=True,
+            use_routellm=True,
         )
 
         return RouteResponse(
@@ -317,6 +326,8 @@ async def route_request(
             complexity_score=result.get("complexity_score"),
             routing_reason=result.get("routing_reason"),
             estimated_savings_usd=float(result.get("estimated_savings_usd", 0)),
+            routellm_win_rate=result.get("routellm_win_rate"),
+            routellm_used=result.get("routellm_used", False),
         )
 
     except Exception as e:

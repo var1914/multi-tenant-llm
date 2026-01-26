@@ -7,6 +7,11 @@ interface RoutingSettings {
   smart_routing_enabled: boolean
   routing_strategy: string
   available_strategies: Record<string, { description: string; complexity_threshold: number }>
+  // RouteLLM settings
+  routellm_enabled: boolean
+  routellm_threshold: number
+  routellm_available: boolean
+  cascade_routing_enabled: boolean
 }
 
 interface RoutingStats {
@@ -49,6 +54,10 @@ interface TestResult {
   task_type: string | null
   task_confidence: number
   semantic_routing_used: boolean
+  // RouteLLM fields
+  routellm_used: boolean
+  routellm_win_rate: number | null
+  routellm_confident: boolean
   routing_reason: string
   estimated_savings_usd: number
 }
@@ -167,6 +176,44 @@ function ScoringBreakdown({ result }: { result: TestResult }) {
           {complexityPercent > 50 ? '🔥 Complex Query' : '✨ Simple Query'}
         </div>
       </div>
+
+      {/* RouteLLM Win-Rate (if used) */}
+      {result.routellm_used && result.routellm_win_rate !== null && (
+        <div className="p-4 border border-pink-200 rounded-lg bg-gradient-to-br from-pink-50 to-purple-50">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-700">RouteLLM ML Prediction</span>
+            <span className={clsx(
+              "px-2 py-0.5 text-xs rounded-full font-medium",
+              result.routellm_confident
+                ? "bg-green-100 text-green-700"
+                : "bg-amber-100 text-amber-700"
+            )}>
+              {result.routellm_confident ? 'Confident' : 'Uncertain'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 flex items-center justify-center text-xl">
+              🤖
+            </div>
+            <div className="flex-1">
+              <div className="text-lg font-semibold text-gray-900">
+                {(result.routellm_win_rate * 100).toFixed(1)}% Win-Rate
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all duration-700"
+                    style={{ width: `${animationComplete ? result.routellm_win_rate * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-sm text-gray-500">
+                  P(strong wins)
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Task Classification */}
       {result.task_type && (
@@ -346,6 +393,42 @@ function RoutingFlowVisualization({ result, isLoading }: { result: TestResult | 
         {/* Connector */}
         <div className="ml-5 w-0.5 h-4 bg-gray-700" />
 
+        {/* Step 3.5: RouteLLM Prediction (if used) */}
+        {result?.routellm_used && (
+          <>
+            <div className={clsx(
+              'flex items-center gap-4 transition-opacity duration-300',
+              step >= 3 ? 'opacity-100' : 'opacity-40'
+            )}>
+              <div className={clsx(
+                'w-10 h-10 rounded-lg flex items-center justify-center transition-colors',
+                step >= 3 ? 'bg-gradient-to-r from-pink-500 to-purple-500' : 'bg-gray-700'
+              )}>
+                <span className="text-lg">🤖</span>
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-medium">RouteLLM ML Prediction</div>
+                <div className="text-xs text-gray-500">
+                  {step >= 3 && result.routellm_win_rate !== null ? (
+                    <span className="text-pink-400">
+                      P(strong wins) = {(result.routellm_win_rate * 100).toFixed(1)}%
+                      {result.routellm_confident && (
+                        <span className="ml-2 px-1.5 py-0.5 bg-green-900/50 rounded text-green-400 text-xs">
+                          Confident
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    'Running ML prediction...'
+                  )}
+                </div>
+              </div>
+              {step >= 3 && <div className="w-2 h-2 rounded-full bg-pink-400" />}
+            </div>
+            <div className="ml-5 w-0.5 h-4 bg-gray-700" />
+          </>
+        )}
+
         {/* Step 4: Routing Decision */}
         <div className={clsx(
           'flex items-center gap-4 transition-opacity duration-300',
@@ -501,7 +584,7 @@ export default function SmartRouting() {
         </div>
 
         {settings?.smart_routing_enabled && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Routing Strategy</label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -528,6 +611,63 @@ export default function SmartRouting() {
                   )
                 })}
               </div>
+            </div>
+
+            {/* RouteLLM ML Router Settings */}
+            <div className="pt-6 border-t border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-md font-semibold text-gray-900">RouteLLM ML Router</h3>
+                  <p className="text-sm text-gray-500">
+                    Use ML-based win-rate prediction for smarter routing decisions
+                    {!settings.routellm_available && (
+                      <span className="ml-2 text-amber-600">(Not installed on server)</span>
+                    )}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.routellm_enabled ?? false}
+                    disabled={!settings.routellm_available}
+                    onChange={(e) => updateSettingsMutation.mutate({ routellm_enabled: e.target.checked } as Partial<RoutingSettings>)}
+                    className="sr-only peer"
+                  />
+                  <div className={clsx(
+                    "w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600",
+                    !settings.routellm_available && "opacity-50 cursor-not-allowed"
+                  )}></div>
+                </label>
+              </div>
+
+              {settings.routellm_enabled && settings.routellm_available && (
+                <div className="space-y-4 pl-4 border-l-2 border-purple-200">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Win-Rate Threshold: {(settings.routellm_threshold * 100).toFixed(1)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={settings.routellm_threshold}
+                      onChange={(e) => updateSettingsMutation.mutate({
+                        routellm_threshold: parseFloat(e.target.value)
+                      } as Partial<RoutingSettings>)}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>More savings (route aggressively)</span>
+                      <span>Higher quality (route conservatively)</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    RouteLLM predicts P(strong model wins). Requests below threshold route to cheaper models.
+                    Default 11.6% achieves ~85% cost savings at 95% quality.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}

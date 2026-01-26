@@ -14,8 +14,9 @@ Usage:
 import os
 import httpx
 import asyncio
+import time
 from datetime import datetime
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Tuple
 from decimal import Decimal
 
 # LiteLLM imports
@@ -38,10 +39,48 @@ class UsageFlowCallback(CustomLogger):
         # HTTP client for async requests
         self._client: Optional[httpx.AsyncClient] = None
 
-        # Cache for routing decisions (request_id -> routed_model)
-        self._routing_cache: Dict[str, Dict] = {}
+        # Cache for routing decisions with TTL: Dict[request_id, Tuple[routing_data, timestamp]]
+        self._routing_cache: Dict[str, Tuple[Dict, float]] = {}
+        self._cache_ttl_seconds = 300  # 5 minutes TTL
+        self._cache_max_size = 10000   # Max entries to prevent memory bloat
 
         print(f"[UsageFlow] Callback initialized - API URL: {self.api_url}, Enabled: {self.enabled}, Smart Routing: {self.smart_routing_enabled}")
+
+    def _cleanup_routing_cache(self):
+        """Remove expired cache entries and enforce max size."""
+        current_time = time.time()
+
+        # Remove expired entries
+        expired_keys = [
+            k for k, (_, ts) in self._routing_cache.items()
+            if current_time - ts > self._cache_ttl_seconds
+        ]
+        for k in expired_keys:
+            del self._routing_cache[k]
+
+        # Evict oldest entries if over max size
+        if len(self._routing_cache) > self._cache_max_size:
+            sorted_items = sorted(
+                self._routing_cache.items(),
+                key=lambda x: x[1][1]  # Sort by timestamp
+            )
+            # Remove oldest entries to get back under limit
+            for k, _ in sorted_items[:len(self._routing_cache) - self._cache_max_size]:
+                del self._routing_cache[k]
+
+    def _cache_routing_decision(self, request_id: str, routing: Dict):
+        """Cache a routing decision with timestamp."""
+        self._routing_cache[request_id] = (routing, time.time())
+        # Periodic cleanup (every 100 cache additions)
+        if len(self._routing_cache) % 100 == 0:
+            self._cleanup_routing_cache()
+
+    def _get_cached_routing(self, request_id: str) -> Optional[Dict]:
+        """Get and remove a cached routing decision."""
+        if request_id in self._routing_cache:
+            routing, _ = self._routing_cache.pop(request_id)
+            return routing
+        return None
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the async HTTP client."""
@@ -159,8 +198,8 @@ class UsageFlowCallback(CustomLogger):
             if response.status_code == 200:
                 routing = response.json()
 
-                # Cache the routing decision for the success callback
-                self._routing_cache[request_id] = routing
+                # Cache the routing decision for the success callback (with TTL)
+                self._cache_routing_decision(request_id, routing)
 
                 if routing.get("routing_applied"):
                     routed_model = routing.get("routed_model")
@@ -223,6 +262,28 @@ class UsageFlowCallback(CustomLogger):
             # Generate request ID from response if available
             request_id = getattr(response_obj, "id", None) or f"req_{start_time.timestamp()}"
 
+            # Get and clean up cached routing decision (prevents memory leak)
+            metadata = kwargs.get("metadata", {}) or {}
+            usageflow_request_id = metadata.get("usageflow_request_id")
+            cached_routing = None
+            if usageflow_request_id:
+                cached_routing = self._get_cached_routing(usageflow_request_id)
+
+            # Prepare payload metadata
+            payload_metadata = {
+                "start_time": start_time.isoformat(),
+                "end_time": end_time.isoformat(),
+                "duration_ms": int((end_time - start_time).total_seconds() * 1000),
+            }
+
+            # Include routing info if available
+            if cached_routing:
+                payload_metadata["routing_applied"] = cached_routing.get("routing_applied", False)
+                payload_metadata["original_model"] = cached_routing.get("original_model")
+                payload_metadata["complexity_score"] = cached_routing.get("complexity_score")
+                payload_metadata["routellm_win_rate"] = cached_routing.get("routellm_win_rate")
+                payload_metadata["routellm_used"] = cached_routing.get("routellm_used", False)
+
             # Prepare payload
             payload = {
                 "tenant_id": tenant_id,
@@ -234,11 +295,7 @@ class UsageFlowCallback(CustomLogger):
                 "total_tokens": total_tokens,
                 "cost_usd": str(cost),
                 "request_id": request_id,
-                "metadata": {
-                    "start_time": start_time.isoformat(),
-                    "end_time": end_time.isoformat(),
-                    "duration_ms": int((end_time - start_time).total_seconds() * 1000),
-                },
+                "metadata": payload_metadata,
                 "timestamp": end_time.isoformat()
             }
 

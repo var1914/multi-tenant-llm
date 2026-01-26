@@ -18,6 +18,7 @@ from app.models.routing_decision import RoutingDecision
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.services.smart_router import SmartRouter, ROUTING_STRATEGIES, MODEL_TIERS, MODEL_COSTS
+from app.services.routellm_service import is_routellm_available, get_routellm_service
 
 router = APIRouter()
 
@@ -26,12 +27,21 @@ router = APIRouter()
 class RoutingSettingsUpdate(BaseModel):
     smart_routing_enabled: Optional[bool] = None
     routing_strategy: Optional[str] = Field(None, pattern="^(cost_optimized|quality_first)$")
+    # RouteLLM settings
+    routellm_enabled: Optional[bool] = None
+    routellm_threshold: Optional[float] = Field(None, ge=0.0, le=1.0)
+    cascade_routing_enabled: Optional[bool] = None
 
 
 class RoutingSettingsResponse(BaseModel):
     smart_routing_enabled: bool
     routing_strategy: str
     available_strategies: dict
+    # RouteLLM settings
+    routellm_enabled: bool = False
+    routellm_threshold: float = 0.11593
+    routellm_available: bool = False  # System-level availability
+    cascade_routing_enabled: bool = False
 
 
 class RoutingStatsResponse(BaseModel):
@@ -79,6 +89,10 @@ class RouteRequestResponse(BaseModel):
     task_type: Optional[str] = None
     task_confidence: float = 0.0
     semantic_routing_used: bool = False
+    # RouteLLM fields
+    routellm_used: bool = False
+    routellm_win_rate: Optional[float] = None
+    routellm_confident: bool = False
     routing_reason: str
     estimated_savings_usd: float
 
@@ -110,6 +124,10 @@ async def get_routing_settings(
         smart_routing_enabled=tenant.smart_routing_enabled or False,
         routing_strategy=tenant.routing_strategy or "cost_optimized",
         available_strategies=ROUTING_STRATEGIES,
+        routellm_enabled=getattr(tenant, 'routellm_enabled', False) or False,
+        routellm_threshold=float(tenant.routellm_threshold) if getattr(tenant, 'routellm_threshold', None) else 0.11593,
+        routellm_available=is_routellm_available(),
+        cascade_routing_enabled=getattr(tenant, 'cascade_routing_enabled', False) or False,
     )
 
 
@@ -139,6 +157,17 @@ async def update_routing_settings(
             )
         tenant.routing_strategy = settings.routing_strategy
 
+    # RouteLLM settings
+    if settings.routellm_enabled is not None:
+        tenant.routellm_enabled = settings.routellm_enabled
+
+    if settings.routellm_threshold is not None:
+        from decimal import Decimal
+        tenant.routellm_threshold = Decimal(str(settings.routellm_threshold))
+
+    if settings.cascade_routing_enabled is not None:
+        tenant.cascade_routing_enabled = settings.cascade_routing_enabled
+
     await db.commit()
     await db.refresh(tenant)
 
@@ -146,6 +175,10 @@ async def update_routing_settings(
         smart_routing_enabled=tenant.smart_routing_enabled or False,
         routing_strategy=tenant.routing_strategy or "cost_optimized",
         available_strategies=ROUTING_STRATEGIES,
+        routellm_enabled=getattr(tenant, 'routellm_enabled', False) or False,
+        routellm_threshold=float(tenant.routellm_threshold) if getattr(tenant, 'routellm_threshold', None) else 0.11593,
+        routellm_available=is_routellm_available(),
+        cascade_routing_enabled=getattr(tenant, 'cascade_routing_enabled', False) or False,
     )
 
 
@@ -221,6 +254,7 @@ async def test_routing(
 
     Uses hybrid analysis combining:
     - Semantic task classification (embedding-based)
+    - RouteLLM win-rate prediction (ML-based, if enabled)
     - Keyword heuristics (fallback/supplement)
 
     Useful for understanding how a request would be routed.
@@ -228,7 +262,7 @@ async def test_routing(
     router_service = SmartRouter(db)
 
     # Import analyzer
-    from app.services.smart_router import ComplexityAnalyzer, ROUTING_STRATEGIES
+    from app.services.smart_router import ComplexityAnalyzer, ROUTING_STRATEGIES, ROUTELLM_DEFAULT_THRESHOLD
 
     # Temporarily check routing without recording
     tenant = await router_service.get_tenant_settings(current_user.tenant_id)
@@ -237,6 +271,11 @@ async def test_routing(
     complexity_score, complexity_reasons, task_info = ComplexityAnalyzer.analyze(
         request.messages, request.model, use_semantic=True
     )
+
+    # RouteLLM variables
+    routellm_used = False
+    routellm_win_rate = None
+    routellm_confident = False
 
     if not tenant or not tenant.smart_routing_enabled:
         return RouteRequestResponse(
@@ -248,6 +287,9 @@ async def test_routing(
             task_type=task_info.get("task_type"),
             task_confidence=task_info.get("task_confidence", 0.0),
             semantic_routing_used=task_info.get("semantic_available", False),
+            routellm_used=routellm_used,
+            routellm_win_rate=routellm_win_rate,
+            routellm_confident=routellm_confident,
             routing_reason="Routing disabled - enable to see routing decisions",
             estimated_savings_usd=0,
         )
@@ -255,6 +297,7 @@ async def test_routing(
     # Get routing decision (but don't record in test mode)
     strategy = ROUTING_STRATEGIES.get(tenant.routing_strategy, ROUTING_STRATEGIES["cost_optimized"])
     threshold = strategy["complexity_threshold"]
+    routellm_threshold = float(tenant.routellm_threshold) if getattr(tenant, 'routellm_threshold', None) else ROUTELLM_DEFAULT_THRESHOLD
 
     provider = router_service.get_provider_for_model(request.model)
 
@@ -263,14 +306,54 @@ async def test_routing(
     routing_reason = f"Complexity ({complexity_score:.2f}) above threshold ({threshold})"
     estimated_savings = 0.0
 
-    # Complexity-based routing: route to cheaper model when complexity is low
-    if complexity_score < threshold:
+    # Define task_str for routing reason messages
+    task_type = task_info.get("task_type")
+    task_str = f"[{task_type}] " if task_type else ""
+
+    # Try RouteLLM prediction if enabled
+    routellm_decision = None
+    if getattr(tenant, 'routellm_enabled', False) and is_routellm_available():
+        try:
+            routellm_service = get_routellm_service()
+            if routellm_service.is_available():
+                routellm_decision = routellm_service.route(
+                    messages=request.messages,
+                    provider=provider,
+                    threshold=routellm_threshold,
+                )
+                routellm_used = True
+                routellm_win_rate = routellm_decision["strong_win_rate"]
+                routellm_confident = routellm_decision["is_confident"]
+        except Exception:
+            pass  # Fall back to complexity-based routing
+
+    # Combined decision logic
+    should_route_cheap = False
+    routing_signal = "complexity"
+
+    if routellm_decision and routellm_decision["is_confident"]:
+        should_route_cheap = not routellm_decision["use_strong"]
+        routing_signal = "routellm"
+        win_rate = routellm_decision["strong_win_rate"]
+    else:
+        should_route_cheap = complexity_score < threshold
+        routing_signal = "semantic+heuristic"
+
+    if should_route_cheap:
         alternative = router_service.get_alternative_model(request.model, provider, to_premium=False)
         if alternative and alternative.lower() != request.model.lower():
             routed_model = alternative
             routing_applied = True
-            routing_reason = f"{task_str}Low complexity ({complexity_score:.2f}) - would route to {alternative}"
+            if routing_signal == "routellm":
+                routing_reason = f"{task_str}RouteLLM: P(strong wins)={win_rate:.3f} < {routellm_threshold:.3f} - would route to {alternative}"
+            else:
+                routing_reason = f"{task_str}Low complexity ({complexity_score:.2f}) - would route to {alternative}"
             estimated_savings = float(router_service.estimate_savings(request.model, alternative))
+    else:
+        if routing_signal == "routellm":
+            routing_reason = f"{task_str}RouteLLM: P(strong wins)={win_rate:.3f} >= {routellm_threshold:.3f} - using original model"
+        else:
+            routing_reason = f"{task_str}Complexity ({complexity_score:.2f}) >= threshold ({threshold}) - using original model"
 
     return RouteRequestResponse(
         original_model=request.model,
@@ -281,6 +364,9 @@ async def test_routing(
         task_type=task_info.get("task_type"),
         task_confidence=task_info.get("task_confidence", 0.0),
         semantic_routing_used=task_info.get("semantic_available", False),
+        routellm_used=routellm_used,
+        routellm_win_rate=routellm_win_rate,
+        routellm_confident=routellm_confident,
         routing_reason=routing_reason,
         estimated_savings_usd=estimated_savings,
     )

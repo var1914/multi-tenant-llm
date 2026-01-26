@@ -22,6 +22,11 @@ from app.services.semantic_router_service import (
     get_semantic_classifier,
     is_semantic_router_available,
 )
+from app.services.routellm_service import (
+    get_routellm_service,
+    is_routellm_available,
+    DEFAULT_THRESHOLD as ROUTELLM_DEFAULT_THRESHOLD,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -480,6 +485,9 @@ class SmartRouter:
         estimated_savings_usd: Decimal,
         end_customer_id: Optional[UUID] = None,
         request_id: Optional[str] = None,
+        routellm_win_rate: Optional[float] = None,
+        routellm_used: bool = False,
+        routellm_confident: bool = False,
     ) -> RoutingDecision:
         """Record a routing decision for analytics."""
         decision = RoutingDecision(
@@ -493,11 +501,164 @@ class SmartRouter:
             complexity_reasons=complexity_reasons,
             estimated_savings_usd=estimated_savings_usd,
             request_id=request_id,
+            routellm_win_rate=Decimal(str(routellm_win_rate)) if routellm_win_rate is not None else None,
+            routellm_used=routellm_used,
+            routellm_confident=routellm_confident,
         )
         self.db.add(decision)
         await self.db.commit()
         await self.db.refresh(decision)
         return decision
+
+    async def route_request_with_routellm(
+        self,
+        tenant_id: UUID,
+        original_model: str,
+        messages: List[Dict[str, Any]],
+        end_customer_id: Optional[UUID] = None,
+        request_id: Optional[str] = None,
+        use_semantic: bool = True,
+        use_routellm: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Enhanced routing combining:
+        1. Semantic task classification (embedding-based)
+        2. RouteLLM win-rate prediction (ML-based)
+        3. Keyword heuristics (fallback/supplement)
+
+        Decision priority:
+        - If RouteLLM is confident, trust its prediction
+        - Otherwise, fall back to semantic complexity score
+
+        Returns dict with all routing decision metadata.
+        """
+        tenant = await self.get_tenant_settings(tenant_id)
+
+        result = {
+            "routed_model": original_model,
+            "routing_applied": False,
+            "complexity_score": None,
+            "complexity_reasons": [],
+            "task_type": None,
+            "task_confidence": 0.0,
+            "semantic_routing_used": False,
+            "routellm_used": False,
+            "routellm_win_rate": None,
+            "routellm_confident": False,
+            "routing_reason": "Routing disabled",
+            "estimated_savings_usd": Decimal("0"),
+        }
+
+        if not tenant or not tenant.smart_routing_enabled:
+            return result
+
+        # Get routing strategy settings
+        strategy = ROUTING_STRATEGIES.get(
+            tenant.routing_strategy,
+            ROUTING_STRATEGIES["cost_optimized"]
+        )
+        complexity_threshold = strategy["complexity_threshold"]
+
+        # Get RouteLLM threshold (per-tenant setting or default)
+        routellm_threshold = float(tenant.routellm_threshold) if tenant.routellm_threshold else ROUTELLM_DEFAULT_THRESHOLD
+
+        # Step 1: Semantic + Keyword Analysis
+        complexity_score, complexity_reasons, task_info = self.analyzer.analyze(
+            messages, original_model, use_semantic=use_semantic
+        )
+        result["complexity_score"] = complexity_score
+        result["complexity_reasons"] = complexity_reasons
+        result["task_type"] = task_info.get("task_type")
+        result["task_confidence"] = task_info.get("task_confidence", 0.0)
+        result["semantic_routing_used"] = task_info.get("semantic_available", False)
+
+        # Step 2: RouteLLM Win-Rate Prediction (if enabled)
+        provider = self.get_provider_for_model(original_model)
+        routellm_decision = None
+
+        if use_routellm and getattr(tenant, 'routellm_enabled', False) and is_routellm_available():
+            try:
+                routellm_service = get_routellm_service()
+                if routellm_service.is_available():
+                    routellm_decision = routellm_service.route(
+                        messages=messages,
+                        provider=provider,
+                        threshold=routellm_threshold,
+                    )
+                    result["routellm_used"] = True
+                    result["routellm_win_rate"] = routellm_decision["strong_win_rate"]
+                    result["routellm_confident"] = routellm_decision["is_confident"]
+            except Exception as e:
+                logger.warning(f"RouteLLM routing failed: {e}")
+
+        # Step 3: Combined Decision Logic
+        task_type = task_info.get("task_type", "simple")
+        task_str = f"[{task_type}] " if task_type else ""
+
+        should_route_cheap = False
+        routing_signal = "complexity"
+
+        # Decision priority:
+        # 1. If RouteLLM is confident, trust its prediction
+        # 2. Otherwise, use semantic complexity score
+        if routellm_decision and routellm_decision["is_confident"]:
+            should_route_cheap = not routellm_decision["use_strong"]
+            routing_signal = "routellm"
+            win_rate = routellm_decision["strong_win_rate"]
+        else:
+            should_route_cheap = complexity_score < complexity_threshold
+            routing_signal = "semantic+heuristic"
+
+        if should_route_cheap:
+            alternative = self.get_alternative_model(original_model, provider, to_premium=False)
+            if alternative and alternative.lower() != original_model.lower():
+                result["routed_model"] = alternative
+                result["routing_applied"] = True
+
+                if routing_signal == "routellm":
+                    result["routing_reason"] = (
+                        f"{task_str}RouteLLM: P(strong wins)={win_rate:.3f} < {routellm_threshold:.3f} "
+                        f"- routed to {alternative}"
+                    )
+                else:
+                    result["routing_reason"] = (
+                        f"{task_str}Complexity ({complexity_score:.2f}) < {complexity_threshold} "
+                        f"- routed to {alternative}"
+                    )
+
+                result["estimated_savings_usd"] = self.estimate_savings(original_model, alternative)
+            else:
+                result["routing_reason"] = f"{task_str}Low complexity but no cheaper alternative available"
+        else:
+            if routing_signal == "routellm":
+                result["routing_reason"] = (
+                    f"{task_str}RouteLLM: P(strong wins)={win_rate:.3f} >= {routellm_threshold:.3f} "
+                    f"- using original model"
+                )
+            else:
+                result["routing_reason"] = (
+                    f"{task_str}Complexity ({complexity_score:.2f}) >= threshold ({complexity_threshold}) "
+                    f"- using original model"
+                )
+
+        # Record the routing decision
+        await self.record_decision(
+            tenant_id=tenant_id,
+            end_customer_id=end_customer_id,
+            original_model=original_model,
+            routed_model=result["routed_model"],
+            routing_applied=result["routing_applied"],
+            routing_reason=result["routing_reason"],
+            complexity_score=complexity_score,
+            complexity_reasons=complexity_reasons,
+            estimated_savings_usd=result["estimated_savings_usd"],
+            request_id=request_id,
+            routellm_win_rate=result.get("routellm_win_rate"),
+            routellm_used=result.get("routellm_used", False),
+            routellm_confident=result.get("routellm_confident", False),
+        )
+
+        return result
 
     async def get_routing_stats(
         self,

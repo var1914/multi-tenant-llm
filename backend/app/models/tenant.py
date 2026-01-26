@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, String, Boolean, ForeignKey, DateTime, Numeric
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.models.base import UUIDMixin, TimestampMixin
@@ -22,6 +22,11 @@ class Tenant(Base, UUIDMixin, TimestampMixin):
     # Smart Routing settings
     smart_routing_enabled = Column(Boolean, default=False)
     routing_strategy = Column(String(50), default="cost_optimized")
+
+    # RouteLLM ML-based routing settings
+    routellm_enabled = Column(Boolean, default=False)
+    routellm_threshold = Column(Numeric(5, 5), default=0.11593)  # Default from RouteLLM paper
+    cascade_routing_enabled = Column(Boolean, default=False)
 
     # Prediction settings
     prediction_alerts_enabled = Column(Boolean, default=True)
