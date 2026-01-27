@@ -1,10 +1,12 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime
+from decimal import Decimal
 import re
 
 from app.models.user import User
 from app.models.tenant import Tenant
+from app.models.trial_request import TrialRequest, TrialRequestStatus
 from app.schemas.auth import UserRegister, UserLogin
 from app.utils.auth import get_password_hash, verify_password, create_access_token
 
@@ -39,13 +41,27 @@ class AuthService:
             slug = f"{base_slug}-{counter}"
             counter += 1
 
-        # Create tenant
+        # Check if user has an approved trial request
+        trial_result = await self.db.execute(
+            select(TrialRequest).where(
+                TrialRequest.email == data.email,
+                TrialRequest.status == TrialRequestStatus.APPROVED
+            )
+        )
+        approved_trial = trial_result.scalar_one_or_none()
+
+        # Create tenant with trial credits if approved
         tenant = Tenant(
             company_name=data.company_name,
             slug=slug,
+            trial_credits_usd=Decimal("5.00") if approved_trial else Decimal("0"),
         )
         self.db.add(tenant)
         await self.db.flush()
+
+        # Link trial request to tenant
+        if approved_trial:
+            approved_trial.tenant_id = tenant.id
 
         # Create user
         user = User(

@@ -31,6 +31,9 @@ class Tenant(Base, UUIDMixin, TimestampMixin):
     # Prediction settings
     prediction_alerts_enabled = Column(Boolean, default=True)
 
+    # Trial credits (added when user registers with approved trial)
+    trial_credits_usd = Column(Numeric(10, 2), default=0)
+
     # Relationships
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     end_customers = relationship("EndCustomer", back_populates="tenant", cascade="all, delete-orphan")
