@@ -1,0 +1,23 @@
+# Playwright artifacts
+test-results/
+playwright-report/
+playwright/.auth/
+
+# Screenshots and videos
+*.png
+*.jpg
+*.webm
+*.mp4
+
+# Trace files
+*.zip
+
+# Node modules (if running e2e separately)
+node_modules/
+
+# Environment files
+.env.e2e
+.env.local
+
+# Debug files
+debug*.spec.ts
