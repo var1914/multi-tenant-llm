@@ -3,30 +3,43 @@ Semantic Router Service for intelligent task classification.
 
 Uses sentence embeddings to classify prompts into task categories,
 enabling more accurate model routing than keyword matching.
+
+MEMORY OPTIMIZATION:
+- Set SEMANTIC_ROUTER_DISABLED=true to completely disable semantic routing
+- The embedding model (~80MB) is loaded ONLY on first classification
+- Uses all-MiniLM-L6-v2 for fast inference (~15ms per classification)
 """
 
+import os
 import logging
 from typing import Optional, Tuple, List, Dict, Any
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-# Flag to check if semantic_router is available
-SEMANTIC_ROUTER_AVAILABLE = False
+# Environment variable to disable semantic router entirely (saves ~80-150MB RAM)
+SEMANTIC_ROUTER_DISABLED = os.getenv("SEMANTIC_ROUTER_DISABLED", "false").lower() in ("true", "1", "yes")
+
+# Flag to check if semantic_router library is importable
+SEMANTIC_ROUTER_IMPORTABLE = False
 Route = None
 HuggingFaceEncoder = None
 SemanticRouter = None
 
-try:
-    from semantic_router import Route
-    from semantic_router.encoders import HuggingFaceEncoder
-    from semantic_router.routers import SemanticRouter
-    SEMANTIC_ROUTER_AVAILABLE = True
-except ImportError:
-    logger.warning("semantic-router not installed. Using fallback classification.")
-except Exception as e:
-    # Python 3.12 has compatibility issues with semantic-router's Pydantic v1 usage
-    logger.warning(f"semantic-router failed to load (Python 3.12 compatibility): {e}")
+if not SEMANTIC_ROUTER_DISABLED:
+    try:
+        from semantic_router import Route
+        from semantic_router.encoders import HuggingFaceEncoder
+        from semantic_router.routers import SemanticRouter
+        SEMANTIC_ROUTER_IMPORTABLE = True
+        logger.info("Semantic router library available (lazy loading enabled)")
+    except ImportError:
+        logger.warning("semantic-router not installed. Using fallback classification.")
+    except Exception as e:
+        # Python 3.12 has compatibility issues with semantic-router's Pydantic v1 usage
+        logger.warning(f"semantic-router failed to import (Python 3.12 compatibility): {e}")
+else:
+    logger.info("Semantic router disabled via SEMANTIC_ROUTER_DISABLED environment variable")
 
 
 # Task categories with example utterances for embedding-based classification
@@ -177,11 +190,15 @@ class SemanticTaskClassifier:
 
     Uses the all-MiniLM-L6-v2 model for fast (~15ms) classification.
     Falls back to keyword matching if semantic-router is not available.
+
+    LAZY LOADING: The embedding model is NOT loaded until the first classification.
+    This saves ~80-150MB of memory on servers that don't use semantic routing.
     """
 
     _instance: Optional['SemanticTaskClassifier'] = None
     _router: Optional[Any] = None
     _initialized: bool = False
+    _load_attempted: bool = False
 
     def __new__(cls):
         if cls._instance is None:
@@ -192,15 +209,21 @@ class SemanticTaskClassifier:
         if self._initialized:
             return
         self._initialized = True
-        self._initialize_router()
+        # NOTE: Do NOT initialize router here - lazy load on first use
 
-    def _initialize_router(self):
-        """Initialize the semantic router with task routes."""
-        if not SEMANTIC_ROUTER_AVAILABLE:
+    def _ensure_router(self) -> bool:
+        """Lazy-load the router on first use. Returns True if available."""
+        if self._load_attempted:
+            return self._router is not None
+
+        self._load_attempted = True
+
+        if not SEMANTIC_ROUTER_IMPORTABLE:
             logger.warning("Semantic router not available, using fallback")
-            return
+            return False
 
         try:
+            logger.info("Lazy-loading semantic router embedding model (this may take a moment)...")
             # Use lightweight model for fast inference
             encoder = HuggingFaceEncoder(
                 model_name="sentence-transformers/all-MiniLM-L6-v2"
@@ -220,14 +243,22 @@ class SemanticTaskClassifier:
                 routes=routes,
             )
             logger.info("Semantic router initialized successfully")
+            return True
 
         except Exception as e:
             logger.error(f"Failed to initialize semantic router: {e}")
             self._router = None
+            return False
+
+    def is_loaded(self) -> bool:
+        """Check if the embedding model is already loaded in memory."""
+        return self._router is not None
 
     def classify(self, text: str) -> Tuple[str, float]:
         """
         Classify a prompt into a task category.
+
+        NOTE: This will lazy-load the embedding model on first call (~80MB, may take a few seconds).
 
         Args:
             text: The prompt text to classify
@@ -235,7 +266,8 @@ class SemanticTaskClassifier:
         Returns:
             Tuple of (task_name, confidence_score)
         """
-        if self._router is None:
+        # Lazy-load the router if not already loaded
+        if not self._ensure_router():
             return self._fallback_classify(text)
 
         try:
@@ -324,5 +356,5 @@ def get_semantic_classifier() -> SemanticTaskClassifier:
 
 
 def is_semantic_router_available() -> bool:
-    """Check if semantic router is available."""
-    return SEMANTIC_ROUTER_AVAILABLE
+    """Check if semantic router library is available (not necessarily loaded yet)."""
+    return SEMANTIC_ROUTER_IMPORTABLE and not SEMANTIC_ROUTER_DISABLED

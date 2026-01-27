@@ -6,26 +6,38 @@ whether a strong model is needed for a given query. This enables
 intelligent cost-quality tradeoffs with ~85% cost savings at 95% quality.
 
 RouteLLM paper: https://arxiv.org/abs/2406.18665
+
+MEMORY OPTIMIZATION:
+- Set ROUTELLM_DISABLED=true to completely disable RouteLLM
+- The MF router weights (~100MB) are loaded ONLY on first prediction
+- Use is_routellm_available() to check before making predictions
 """
 
+import os
 import logging
 from typing import Optional, Dict, Any, Tuple, List
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-# RouteLLM availability flag
-ROUTELLM_AVAILABLE = False
+# Environment variable to disable RouteLLM entirely (saves ~100-200MB RAM)
+ROUTELLM_DISABLED = os.getenv("ROUTELLM_DISABLED", "false").lower() in ("true", "1", "yes")
+
+# RouteLLM availability flag (library importable, not necessarily loaded)
+ROUTELLM_IMPORTABLE = False
 Controller = None
 
-try:
-    from routellm.controller import Controller
-    ROUTELLM_AVAILABLE = True
-    logger.info("RouteLLM loaded successfully")
-except ImportError:
-    logger.warning("routellm not installed. Install with: pip install routellm")
-except Exception as e:
-    logger.warning(f"routellm failed to load: {e}")
+if not ROUTELLM_DISABLED:
+    try:
+        from routellm.controller import Controller
+        ROUTELLM_IMPORTABLE = True
+        logger.info("RouteLLM library available (lazy loading enabled)")
+    except ImportError:
+        logger.warning("routellm not installed. Install with: pip install routellm")
+    except Exception as e:
+        logger.warning(f"routellm failed to import: {e}")
+else:
+    logger.info("RouteLLM disabled via ROUTELLM_DISABLED environment variable")
 
 
 # Model pair configurations per provider
@@ -63,6 +75,9 @@ class RouteLLMService:
     - Accuracy: 85% cost reduction at 95% quality (MT Bench)
     - Model size: ~100MB (MF router weights)
 
+    LAZY LOADING: The model is NOT loaded until the first prediction is made.
+    This saves memory on servers that don't use RouteLLM routing.
+
     Usage:
         service = get_routellm_service()
         if service.is_available():
@@ -74,6 +89,7 @@ class RouteLLMService:
     _instance: Optional['RouteLLMService'] = None
     _controller: Optional[Any] = None
     _initialized: bool = False
+    _load_attempted: bool = False
 
     def __new__(cls):
         if cls._instance is None:
@@ -84,15 +100,21 @@ class RouteLLMService:
         if self._initialized:
             return
         self._initialized = True
-        self._initialize_controller()
+        # NOTE: Do NOT initialize controller here - lazy load on first use
 
-    def _initialize_controller(self):
-        """Initialize the RouteLLM controller with MF router."""
-        if not ROUTELLM_AVAILABLE:
+    def _ensure_controller(self) -> bool:
+        """Lazy-load the controller on first use. Returns True if available."""
+        if self._load_attempted:
+            return self._controller is not None
+
+        self._load_attempted = True
+
+        if not ROUTELLM_IMPORTABLE:
             logger.warning("RouteLLM not available, routing will use fallback")
-            return
+            return False
 
         try:
+            logger.info("Lazy-loading RouteLLM MF router (this may take a moment)...")
             # MF router is recommended - fastest with best accuracy tradeoff
             # Using OpenAI models as reference (training was done on these)
             self._controller = Controller(
@@ -101,13 +123,19 @@ class RouteLLMService:
                 weak_model="gpt-4o-mini",
             )
             logger.info("RouteLLM controller initialized with MF router")
+            return True
         except Exception as e:
             logger.error(f"Failed to initialize RouteLLM: {e}")
             self._controller = None
+            return False
 
     def is_available(self) -> bool:
-        """Check if RouteLLM is available and initialized."""
-        return ROUTELLM_AVAILABLE and self._controller is not None
+        """Check if RouteLLM can be used (library importable, not necessarily loaded yet)."""
+        return ROUTELLM_IMPORTABLE and not ROUTELLM_DISABLED
+
+    def is_loaded(self) -> bool:
+        """Check if RouteLLM model is already loaded in memory."""
+        return self._controller is not None
 
     def _format_messages(self, messages: List[Dict[str, Any]]) -> str:
         """
@@ -141,6 +169,8 @@ class RouteLLMService:
         The MF router uses matrix factorization on preference data to
         estimate when the expensive model provides meaningfully better output.
 
+        NOTE: This will lazy-load the model on first call (~100MB, may take a few seconds).
+
         Args:
             messages: List of message dicts with 'role' and 'content'
 
@@ -149,7 +179,8 @@ class RouteLLMService:
             - win_rate: P(strong model provides better response)
             - is_confident: True if prediction is reliable (model available)
         """
-        if not self.is_available():
+        # Lazy-load the controller if not already loaded
+        if not self._ensure_controller():
             # Fallback: 50% means "uncertain, don't route"
             return 0.5, False
 
@@ -232,5 +263,5 @@ def get_routellm_service() -> RouteLLMService:
 
 
 def is_routellm_available() -> bool:
-    """Check if RouteLLM library is available."""
-    return ROUTELLM_AVAILABLE
+    """Check if RouteLLM library is available (not necessarily loaded yet)."""
+    return ROUTELLM_IMPORTABLE and not ROUTELLM_DISABLED

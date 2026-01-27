@@ -519,6 +519,12 @@ export default function SmartRouting() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['routing-settings'] })
     },
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
+      const message = error.response?.data?.detail || error.message || 'Failed to update settings'
+      alert(`Error: ${message}`)
+      // Refetch to reset UI to server state
+      queryClient.invalidateQueries({ queryKey: ['routing-settings'] })
+    },
   })
 
   // Test routing mutation
@@ -573,12 +579,16 @@ export default function SmartRouting() {
             <input
               type="checkbox"
               checked={settings?.smart_routing_enabled ?? false}
+              disabled={updateSettingsMutation.isPending}
               onChange={(e) => updateSettingsMutation.mutate({ smart_routing_enabled: e.target.checked })}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            <div className={clsx(
+              "w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600",
+              updateSettingsMutation.isPending && "opacity-50"
+            )}></div>
             <span className="ml-3 text-sm font-medium text-gray-900">
-              {settings?.smart_routing_enabled ? 'Enabled' : 'Disabled'}
+              {updateSettingsMutation.isPending ? 'Updating...' : (settings?.smart_routing_enabled ? 'Enabled' : 'Disabled')}
             </span>
           </label>
         </div>
