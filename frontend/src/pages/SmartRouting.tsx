@@ -97,39 +97,25 @@ function ScoringBreakdown({ result }: { result: TestResult }) {
   const complexityPercent = (result.complexity_score || 0) * 100
   const taskStyle = result.task_type ? TASK_STYLES[result.task_type] || TASK_STYLES.simple : TASK_STYLES.simple
 
-  // Parse complexity reasons into visual factors
+  // Parse ML-based complexity reasons into visual factors
   const factors = result.complexity_reasons.map(reason => {
     let impact: 'positive' | 'negative' | 'neutral' = 'neutral'
     let value = 0
 
-    if (reason.includes('Complex keywords')) {
-      impact = 'positive'
-      const match = reason.match(/\((\d+)\)/)
-      value = match ? parseInt(match[1]) * 5 : 10
-    } else if (reason.includes('Simple keywords')) {
-      impact = 'negative'
-      const match = reason.match(/\((\d+)\)/)
-      value = match ? parseInt(match[1]) * 5 : 10
-    } else if (reason.includes('Code blocks')) {
-      impact = 'positive'
-      value = 10
-    } else if (reason.includes('Short request')) {
-      impact = 'negative'
-      value = 5
-    } else if (reason.includes('Long request')) {
+    if (reason.includes('ML Task:') || reason.includes('Task:')) {
+      // ML Task classification impact (primary signal)
+      const isComplex = reason.includes('premium')
+      impact = isComplex ? 'positive' : 'negative'
+      value = 25
+    } else if (reason.includes('Long context')) {
       impact = 'positive'
       value = 5
     } else if (reason.includes('Multi-turn')) {
       impact = 'positive'
       value = 5
-    } else if (reason.includes('Complex system')) {
-      impact = 'positive'
-      value = 5
-    } else if (reason.includes('Task:')) {
-      // Task classification impact
-      const isComplex = reason.includes('premium')
-      impact = isComplex ? 'positive' : 'negative'
-      value = 15
+    } else if (reason.includes('unavailable')) {
+      impact = 'neutral'
+      value = 0
     }
 
     return { reason, impact, value }
@@ -253,9 +239,9 @@ function ScoringBreakdown({ result }: { result: TestResult }) {
         </div>
       )}
 
-      {/* Scoring Factors */}
+      {/* ML Scoring Factors */}
       <div className="p-4 border border-gray-200 rounded-lg bg-white">
-        <div className="text-sm font-medium text-gray-700 mb-3">Scoring Factors</div>
+        <div className="text-sm font-medium text-gray-700 mb-3">ML Scoring Factors</div>
         <div className="space-y-2">
           {factors.map((factor, i) => (
             <div key={i} className="flex items-center gap-2 text-sm">
@@ -364,7 +350,7 @@ function RoutingFlowVisualization({ result, isLoading }: { result: TestResult | 
         {/* Connector */}
         <div className="ml-5 w-0.5 h-4 bg-gray-700" />
 
-        {/* Step 3: Complexity Scoring */}
+        {/* Step 3: ML Complexity Scoring */}
         <div className={clsx(
           'flex items-center gap-4 transition-opacity duration-300',
           step >= 3 ? 'opacity-100' : 'opacity-40'
@@ -378,12 +364,12 @@ function RoutingFlowVisualization({ result, isLoading }: { result: TestResult | 
             </svg>
           </div>
           <div className="flex-1">
-            <div className="text-sm font-medium">Complexity Scoring</div>
+            <div className="text-sm font-medium">ML Complexity Score</div>
             <div className="text-xs text-gray-500">
               {step >= 3 && result && result.complexity_score !== null ? (
                 <span className="text-amber-400">Score: {((result.complexity_score || 0) * 100).toFixed(0)}%</span>
               ) : (
-                'Combining semantic + heuristic signals...'
+                'Computing ML-based complexity score...'
               )}
             </div>
           </div>
@@ -564,7 +550,7 @@ export default function SmartRouting() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Smart Routing</h1>
         <p className="text-gray-600">
-          ML-powered routing that automatically sends simple queries to cheaper models
+          ML-powered routing using RouteLLM and semantic classification - no keyword heuristics, just AI
         </p>
       </div>
 

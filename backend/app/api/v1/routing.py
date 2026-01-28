@@ -252,12 +252,11 @@ async def test_routing(
     """
     Test routing decision without recording it.
 
-    Uses hybrid analysis combining:
-    - Semantic task classification (embedding-based)
-    - RouteLLM win-rate prediction (ML-based, if enabled)
-    - Keyword heuristics (fallback/supplement)
+    Uses ML-based routing pipeline:
+    1. RouteLLM (Primary) - ML win-rate prediction (~85% cost savings at 95% quality)
+    2. Semantic Classification (Fallback) - Embedding-based task classification
 
-    Useful for understanding how a request would be routed.
+    No keyword-based heuristics - ML models provide better accuracy.
     """
     router_service = SmartRouter(db)
 
@@ -267,7 +266,7 @@ async def test_routing(
     # Temporarily check routing without recording
     tenant = await router_service.get_tenant_settings(current_user.tenant_id)
 
-    # Analyze using hybrid approach (semantic + keywords)
+    # Analyze using ML-based semantic classification
     complexity_score, complexity_reasons, task_info = ComplexityAnalyzer.analyze(
         request.messages, request.model, use_semantic=True
     )
@@ -337,7 +336,7 @@ async def test_routing(
         win_rate = routellm_decision["strong_win_rate"]
     else:
         should_route_cheap = complexity_score < threshold
-        routing_signal = "semantic+heuristic"
+        routing_signal = "semantic"
 
     if should_route_cheap:
         alternative = router_service.get_alternative_model(request.model, provider, to_premium=False)
@@ -347,13 +346,13 @@ async def test_routing(
             if routing_signal == "routellm":
                 routing_reason = f"{task_str}RouteLLM: P(strong wins)={win_rate:.3f} < {routellm_threshold:.3f} - would route to {alternative}"
             else:
-                routing_reason = f"{task_str}Low complexity ({complexity_score:.2f}) - would route to {alternative}"
+                routing_reason = f"{task_str}ML Semantic: score ({complexity_score:.2f}) - would route to {alternative}"
             estimated_savings = float(router_service.estimate_savings(request.model, alternative))
     else:
         if routing_signal == "routellm":
             routing_reason = f"{task_str}RouteLLM: P(strong wins)={win_rate:.3f} >= {routellm_threshold:.3f} - using original model"
         else:
-            routing_reason = f"{task_str}Complexity ({complexity_score:.2f}) >= threshold ({threshold}) - using original model"
+            routing_reason = f"{task_str}ML Semantic: score ({complexity_score:.2f}) >= threshold ({threshold}) - using original model"
 
     return RouteRequestResponse(
         original_model=request.model,

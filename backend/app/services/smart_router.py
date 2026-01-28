@@ -1,11 +1,14 @@
 """
 Smart Model Routing Service.
 
-Analyzes request complexity and routes to the most cost-effective model
+Uses ML-based routing to intelligently select the most cost-effective model
 while maintaining quality for complex tasks.
 
-Combines keyword-based heuristics with semantic task classification
-for improved routing accuracy.
+Routing Pipeline:
+1. RouteLLM (Primary) - ML-based win-rate prediction (~85% cost savings at 95% quality)
+2. Semantic Classification (Fallback) - Embedding-based task classification
+
+No keyword-based heuristics - ML models provide better accuracy for modern users.
 """
 
 import re
@@ -123,60 +126,11 @@ ROUTING_STRATEGIES = {
 
 class ComplexityAnalyzer:
     """
-    Analyzes request complexity using a hybrid approach:
-    1. Semantic task classification (embedding-based)
-    2. Keyword-based heuristics (fallback/supplement)
+    Analyzes request complexity using ML-based approaches only.
+
+    Uses semantic task classification (embedding-based) for task detection.
+    No keyword-based heuristics - ML models provide better accuracy.
     """
-
-    # Keywords indicating complex tasks
-    COMPLEX_KEYWORDS = [
-        r"\banalyze\b", r"\bcompare\b", r"\bcontrast\b", r"\bevaluate\b",
-        r"\bexplain.*detail", r"\bstep.by.step\b", r"\breason\b", r"\bproof\b",
-        r"\bderive\b", r"\bprove\b", r"\bcritique\b", r"\bdebug\b",
-        r"\barchitect\b", r"\bdesign\b", r"\boptimize\b", r"\brefactor\b",
-        r"\bmathematic", r"\balgorithm\b", r"\bcode review\b",
-    ]
-
-    # Keywords indicating simple tasks
-    SIMPLE_KEYWORDS = [
-        r"\btranslate\b", r"\bsummarize\b", r"\blist\b", r"\bformat\b",
-        r"\bconvert\b", r"\bextract\b", r"\bclassify\b", r"\bcategorize\b",
-        r"\byes.or.no\b", r"\btrue.or.false\b", r"\bsimple\b",
-        r"\bquick\b", r"\bbrief\b", r"\bshort\b",
-    ]
-
-    # Task detection keywords (for fallback when semantic router unavailable)
-    TASK_KEYWORDS = {
-        "coding": [r"\bcode\b", r"\bfunction\b", r"\bclass\b", r"\bapi\b", r"\bdebug\b",
-                   r"\bpython\b", r"\bjavascript\b", r"\btypescript\b", r"\bsql\b",
-                   r"\bimplement\b", r"\brefactor\b", r"\bwrite.*script\b", r"```"],
-        "analysis": [r"\banalyze\b", r"\bcompare\b", r"\bevaluate\b", r"\bpros.and.cons\b",
-                     r"\btradeoff\b", r"\breview\b", r"\bassess\b", r"\bcritique\b"],
-        "reasoning": [r"\bstep.by.step\b", r"\breason\b", r"\bprove\b", r"\bderive\b",
-                      r"\bexplain.*why\b", r"\blogic\b", r"\bmath\b", r"\bcalculate\b"],
-        "creative": [r"\bstory\b", r"\bpoem\b", r"\bbrainstorm\b", r"\bcreative\b",
-                     r"\bimagine\b", r"\bblog\b", r"\bmarketing\b", r"\btagline\b"],
-        "translation": [r"\btranslate\b", r"\bspanish\b", r"\bfrench\b", r"\bgerman\b",
-                        r"\bchinese\b", r"\bjapanese\b", r"\bkorean\b", r"\blanguage\b"],
-        "summarization": [r"\bsummarize\b", r"\bsummary\b", r"\btldr\b", r"\bkey.points\b",
-                          r"\bcondense\b", r"\bbrief\b", r"\boverview\b"],
-        "extraction": [r"\bextract\b", r"\bpull.out\b", r"\bfind.all\b", r"\blist.the\b",
-                       r"\bidentify\b", r"\bparse\b"],
-    }
-
-    @classmethod
-    def _detect_task_from_keywords(cls, text_lower: str) -> str:
-        """Detect task type from keywords when semantic router is unavailable."""
-        best_task = "simple"
-        best_score = 0
-
-        for task, patterns in cls.TASK_KEYWORDS.items():
-            matches = sum(1 for p in patterns if re.search(p, text_lower))
-            if matches > best_score:
-                best_score = matches
-                best_task = task
-
-        return best_task
 
     @classmethod
     def analyze(
@@ -186,7 +140,7 @@ class ComplexityAnalyzer:
         use_semantic: bool = True,
     ) -> Tuple[float, List[str], Dict[str, Any]]:
         """
-        Analyze complexity of a request using hybrid approach.
+        Analyze complexity of a request using ML-based semantic classification.
 
         Args:
             messages: List of message dicts
@@ -197,11 +151,12 @@ class ComplexityAnalyzer:
             Tuple of (complexity_score 0-1, list of reasons, task_info dict)
         """
         reasons = []
-        score = 0.5  # Start at neutral
+        score = 0.5  # Start at neutral (will be adjusted by semantic classifier)
         task_info = {
             "task_type": None,
             "task_confidence": 0.0,
             "semantic_available": is_semantic_router_available(),
+            "ml_routing": True,  # Flag indicating ML-only routing
         }
 
         # Extract all text content
@@ -215,9 +170,7 @@ class ComplexityAnalyzer:
                     if isinstance(item, dict) and item.get("type") == "text":
                         text_content += " " + item.get("text", "")
 
-        text_lower = text_content.lower()
-
-        # STEP 1: Semantic Task Classification (if available)
+        # ML-Based Semantic Task Classification
         if use_semantic and is_semantic_router_available():
             try:
                 classifier = get_semantic_classifier()
@@ -226,59 +179,31 @@ class ComplexityAnalyzer:
                 task_info["task_type"] = semantic_result["task_type"]
                 task_info["task_confidence"] = semantic_result["task_confidence"]
 
-                # Apply complexity adjustment based on task type
+                # Apply complexity adjustment based on ML task classification
                 complexity_adj = semantic_result["complexity_adjustment"]
                 score += complexity_adj
-                reasons.append(f"Task: {semantic_result['task_type']} ({semantic_result['recommended_tier']})")
+                reasons.append(f"ML Task: {semantic_result['task_type']} ({semantic_result['recommended_tier']})")
 
             except Exception as e:
                 logger.warning(f"Semantic classification failed: {e}")
+                task_info["task_type"] = "unknown"
+                reasons.append("ML classification unavailable")
+        else:
+            # No ML available - use conservative routing (don't route to cheaper)
+            task_info["task_type"] = "unknown"
+            task_info["task_confidence"] = 0.0
+            score = 0.7  # Above threshold - keep original model when ML not available
+            reasons.append("ML routing unavailable - using original model")
 
-        # STEP 2: Keyword-based task detection (fallback when semantic not available)
-        if task_info["task_type"] is None:
-            detected_task = cls._detect_task_from_keywords(text_lower)
-            task_info["task_type"] = detected_task
-            task_info["task_confidence"] = 0.6  # Lower confidence for keyword-based
-            if detected_task != "simple":
-                reasons.append(f"Task: {detected_task} (keyword)")
-
-        # STEP 3: Keyword-based complexity heuristics
-        complex_count = sum(1 for pattern in cls.COMPLEX_KEYWORDS if re.search(pattern, text_lower))
-        if complex_count > 0:
-            complexity_boost = min(0.2, complex_count * 0.05)  # Reduced weight when semantic is used
-            score += complexity_boost
-            reasons.append(f"Complex keywords ({complex_count})")
-
-        simple_count = sum(1 for pattern in cls.SIMPLE_KEYWORDS if re.search(pattern, text_lower))
-        if simple_count > 0:
-            simplicity_reduction = min(0.2, simple_count * 0.05)
-            score -= simplicity_reduction
-            reasons.append(f"Simple keywords ({simple_count})")
-
-        # STEP 4: Structural heuristics
+        # Basic structural signals (not keyword matching, just metadata)
         word_count = len(text_content.split())
-        if word_count < 50:
-            score -= 0.05
-            reasons.append("Short request")
-        elif word_count > 500:
+        if word_count > 500:
             score += 0.05
-            reasons.append("Long request")
+            reasons.append("Long context")
 
         if len(messages) > 4:
             score += 0.05
             reasons.append(f"Multi-turn ({len(messages)} msgs)")
-
-        if re.search(r"```|def |function |class |import |require\(", text_content):
-            score += 0.1
-            reasons.append("Code blocks detected")
-
-        # System prompt complexity
-        system_messages = [m for m in messages if m.get("role") == "system"]
-        if system_messages:
-            system_text = " ".join(m.get("content", "") for m in system_messages if isinstance(m.get("content"), str))
-            if len(system_text) > 500:
-                score += 0.05
-                reasons.append("Complex system prompt")
 
         # Clamp score to 0-1
         score = max(0.0, min(1.0, score))
@@ -294,7 +219,7 @@ class ComplexityAnalyzer:
         Legacy analyze method for backward compatibility.
         Returns only score and reasons (without task_info).
         """
-        score, reasons, _ = cls.analyze(messages, model, use_semantic=False)
+        score, reasons, _ = cls.analyze(messages, model, use_semantic=True)
         return score, reasons
 
 
@@ -395,9 +320,8 @@ class SmartRouter:
         """
         Determine optimal model routing for a request.
 
-        Uses hybrid analysis combining:
-        - Semantic task classification (embedding-based)
-        - Keyword heuristics (fallback/supplement)
+        Uses ML-based semantic task classification for routing decisions.
+        No keyword-based heuristics - ML provides better accuracy.
 
         Returns dict with:
         - routed_model: The model to use
@@ -444,18 +368,18 @@ class SmartRouter:
         task_type = task_info.get("task_type", "simple")
         task_str = f"[{task_type}] " if task_type else ""
 
-        # Complexity-based routing: route to cheaper model when complexity is low
+        # ML-based routing: route to cheaper model when semantic score is low
         if complexity_score < threshold:
             alternative = self.get_alternative_model(original_model, provider, to_premium=False)
             if alternative and alternative.lower() != original_model.lower():
                 result["routed_model"] = alternative
                 result["routing_applied"] = True
-                result["routing_reason"] = f"{task_str}Low complexity ({complexity_score:.2f}) - routed to {alternative}"
+                result["routing_reason"] = f"{task_str}ML Semantic: score ({complexity_score:.2f}) - routed to {alternative}"
                 result["estimated_savings_usd"] = self.estimate_savings(original_model, alternative)
             else:
-                result["routing_reason"] = f"{task_str}Low complexity but no cheaper alternative available"
+                result["routing_reason"] = f"{task_str}Low score but no cheaper alternative available"
         else:
-            result["routing_reason"] = f"{task_str}Complexity ({complexity_score:.2f}) above threshold ({threshold}) - using original model"
+            result["routing_reason"] = f"{task_str}ML Semantic: score ({complexity_score:.2f}) above threshold ({threshold}) - using original model"
 
         # Record the routing decision
         await self.record_decision(
@@ -521,14 +445,16 @@ class SmartRouter:
         use_routellm: bool = True,
     ) -> Dict[str, Any]:
         """
-        Enhanced routing combining:
-        1. Semantic task classification (embedding-based)
-        2. RouteLLM win-rate prediction (ML-based)
-        3. Keyword heuristics (fallback/supplement)
+        ML-based routing using RouteLLM win-rate prediction.
 
-        Decision priority:
-        - If RouteLLM is confident, trust its prediction
-        - Otherwise, fall back to semantic complexity score
+        Routing Pipeline (ML-only, no keywords):
+        1. RouteLLM (Primary) - ML win-rate prediction (~85% cost savings at 95% quality)
+        2. Semantic Classification (Fallback) - Embedding-based task classification
+
+        Decision logic:
+        - If RouteLLM is available & confident → trust its prediction
+        - If RouteLLM unavailable → use semantic task classification
+        - No keyword-based heuristics for better accuracy
 
         Returns dict with all routing decision metadata.
         """
@@ -562,7 +488,7 @@ class SmartRouter:
         # Get RouteLLM threshold (per-tenant setting or default)
         routellm_threshold = float(tenant.routellm_threshold) if tenant.routellm_threshold else ROUTELLM_DEFAULT_THRESHOLD
 
-        # Step 1: Semantic + Keyword Analysis
+        # Step 1: ML-Based Semantic Task Analysis
         complexity_score, complexity_reasons, task_info = self.analyzer.analyze(
             messages, original_model, use_semantic=use_semantic
         )
@@ -607,7 +533,7 @@ class SmartRouter:
             win_rate = routellm_decision["strong_win_rate"]
         else:
             should_route_cheap = complexity_score < complexity_threshold
-            routing_signal = "semantic+heuristic"
+            routing_signal = "semantic"
 
         if should_route_cheap:
             alternative = self.get_alternative_model(original_model, provider, to_premium=False)
@@ -622,7 +548,7 @@ class SmartRouter:
                     )
                 else:
                     result["routing_reason"] = (
-                        f"{task_str}Complexity ({complexity_score:.2f}) < {complexity_threshold} "
+                        f"{task_str}ML Semantic: score ({complexity_score:.2f}) < {complexity_threshold} "
                         f"- routed to {alternative}"
                     )
 
@@ -637,7 +563,7 @@ class SmartRouter:
                 )
             else:
                 result["routing_reason"] = (
-                    f"{task_str}Complexity ({complexity_score:.2f}) >= threshold ({complexity_threshold}) "
+                    f"{task_str}ML Semantic: score ({complexity_score:.2f}) >= threshold ({complexity_threshold}) "
                     f"- using original model"
                 )
 
