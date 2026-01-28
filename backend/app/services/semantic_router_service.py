@@ -24,17 +24,18 @@ SEMANTIC_ROUTER_DISABLED = os.getenv("SEMANTIC_ROUTER_DISABLED", "false").lower(
 SEMANTIC_ROUTER_IMPORTABLE = False
 Route = None
 HuggingFaceEncoder = None
-SemanticRouter = None
+RouteLayer = None  # Was SemanticRouter in older versions
 
 if not SEMANTIC_ROUTER_DISABLED:
     try:
         from semantic_router import Route
         from semantic_router.encoders import HuggingFaceEncoder
-        from semantic_router.routers import SemanticRouter
+        # In semantic-router 0.0.72+, RouteLayer replaces SemanticRouter
+        from semantic_router.layer import RouteLayer
         SEMANTIC_ROUTER_IMPORTABLE = True
         logger.info("Semantic router library available (lazy loading enabled)")
-    except ImportError:
-        logger.warning("semantic-router not installed. Using fallback classification.")
+    except ImportError as e:
+        logger.warning(f"semantic-router not installed or import failed: {e}")
     except Exception as e:
         # Python 3.12 has compatibility issues with semantic-router's Pydantic v1 usage
         logger.warning(f"semantic-router failed to import (Python 3.12 compatibility): {e}")
@@ -242,13 +243,13 @@ class SemanticTaskClassifier:
                 )
                 routes.append(route)
 
-            self._router = SemanticRouter(
+            # RouteLayer replaced SemanticRouter in semantic-router 0.0.72+
+            self._router = RouteLayer(
                 encoder=encoder,
                 routes=routes,
-                auto_sync='local',  # Auto-sync routes to local index
             )
             # Lower threshold for better recall (default is 0.5)
-            self._router.set_threshold(threshold=0.3)
+            self._router.score_threshold = 0.3
             logger.info("Semantic router initialized with local index (threshold=0.3)")
             return True
 
