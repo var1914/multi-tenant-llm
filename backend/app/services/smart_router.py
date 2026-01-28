@@ -170,30 +170,38 @@ class ComplexityAnalyzer:
                     if isinstance(item, dict) and item.get("type") == "text":
                         text_content += " " + item.get("text", "")
 
-        # ML-Based Semantic Task Classification
-        if use_semantic and is_semantic_router_available():
+        # Task Classification (ML-based with fallback)
+        # The classifier handles its own fallback to simple matching if ML unavailable
+        if use_semantic:
             try:
                 classifier = get_semantic_classifier()
                 semantic_result = classifier.analyze_with_task(messages)
 
                 task_info["task_type"] = semantic_result["task_type"]
                 task_info["task_confidence"] = semantic_result["task_confidence"]
+                task_info["semantic_available"] = classifier.is_loaded()
 
-                # Apply complexity adjustment based on ML task classification
+                # Apply complexity adjustment based on task classification
                 complexity_adj = semantic_result["complexity_adjustment"]
                 score += complexity_adj
-                reasons.append(f"ML Task: {semantic_result['task_type']} ({semantic_result['recommended_tier']})")
+
+                # Indicate if using ML or fallback classification
+                if classifier.is_loaded():
+                    reasons.append(f"ML Task: {semantic_result['task_type']} ({semantic_result['recommended_tier']})")
+                else:
+                    reasons.append(f"Task: {semantic_result['task_type']} ({semantic_result['recommended_tier']})")
 
             except Exception as e:
-                logger.warning(f"Semantic classification failed: {e}")
-                task_info["task_type"] = "unknown"
-                reasons.append("ML classification unavailable")
+                logger.warning(f"Task classification failed: {e}")
+                task_info["task_type"] = "simple"
+                task_info["task_confidence"] = 0.5
+                score -= 0.1  # Assume simple when classification fails
+                reasons.append("Classification error - defaulting to simple")
         else:
-            # No ML available - use conservative routing (don't route to cheaper)
+            # Classification explicitly disabled
             task_info["task_type"] = "unknown"
             task_info["task_confidence"] = 0.0
-            score = 0.7  # Above threshold - keep original model when ML not available
-            reasons.append("ML routing unavailable - using original model")
+            reasons.append("Classification disabled")
 
         # Basic structural signals (not keyword matching, just metadata)
         word_count = len(text_content.split())
