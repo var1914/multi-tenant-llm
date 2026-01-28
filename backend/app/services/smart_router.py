@@ -28,6 +28,7 @@ from app.services.semantic_router_service import (
 from app.services.routellm_service import (
     get_routellm_service,
     is_routellm_available,
+    get_routellm_status,
     DEFAULT_THRESHOLD as ROUTELLM_DEFAULT_THRESHOLD,
 )
 
@@ -509,21 +510,27 @@ class SmartRouter:
         # Step 2: RouteLLM Win-Rate Prediction (if enabled)
         provider = self.get_provider_for_model(original_model)
         routellm_decision = None
+        routellm_status = get_routellm_status()
+        result["routellm_status"] = routellm_status
 
-        if use_routellm and getattr(tenant, 'routellm_enabled', False) and is_routellm_available():
-            try:
-                routellm_service = get_routellm_service()
-                if routellm_service.is_available():
-                    routellm_decision = routellm_service.route(
-                        messages=messages,
-                        provider=provider,
-                        threshold=routellm_threshold,
-                    )
-                    result["routellm_used"] = True
-                    result["routellm_win_rate"] = routellm_decision["strong_win_rate"]
-                    result["routellm_confident"] = routellm_decision["is_confident"]
-            except Exception as e:
-                logger.warning(f"RouteLLM routing failed: {e}")
+        if use_routellm and getattr(tenant, 'routellm_enabled', False):
+            if is_routellm_available():
+                try:
+                    routellm_service = get_routellm_service()
+                    if routellm_service.is_available():
+                        routellm_decision = routellm_service.route(
+                            messages=messages,
+                            provider=provider,
+                            threshold=routellm_threshold,
+                        )
+                        result["routellm_used"] = True
+                        result["routellm_win_rate"] = routellm_decision["strong_win_rate"]
+                        result["routellm_confident"] = routellm_decision["is_confident"]
+                except Exception as e:
+                    logger.warning(f"RouteLLM routing failed: {e}")
+            else:
+                # Log why RouteLLM is unavailable
+                logger.info(f"RouteLLM unavailable: {routellm_status.get('reason')}")
 
         # Step 3: Combined Decision Logic
         task_type = task_info.get("task_type", "simple")

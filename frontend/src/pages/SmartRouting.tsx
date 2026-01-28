@@ -11,6 +11,7 @@ interface RoutingSettings {
   routellm_enabled: boolean
   routellm_threshold: number
   routellm_available: boolean
+  routellm_unavailable_reason: string | null
   cascade_routing_enabled: boolean
 }
 
@@ -616,8 +617,14 @@ export default function SmartRouting() {
                   <h3 className="text-md font-semibold text-gray-900">RouteLLM ML Router</h3>
                   <p className="text-sm text-gray-500">
                     Use ML-based win-rate prediction for smarter routing decisions
-                    {!settings.routellm_available && (
-                      <span className="ml-2 text-amber-600">(Not installed on server)</span>
+                    {!settings.routellm_available && settings.routellm_unavailable_reason && (
+                      <span className="ml-2 text-amber-600">
+                        ({settings.routellm_unavailable_reason.includes('API_KEY')
+                          ? 'Requires OPENAI_API_KEY'
+                          : settings.routellm_unavailable_reason.includes('not installed')
+                            ? 'Not installed on server'
+                            : 'Unavailable'})
+                      </span>
                     )}
                   </p>
                 </div>

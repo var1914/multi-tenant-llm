@@ -18,7 +18,7 @@ from app.models.routing_decision import RoutingDecision
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.services.smart_router import SmartRouter, ROUTING_STRATEGIES, MODEL_TIERS, MODEL_COSTS
-from app.services.routellm_service import is_routellm_available, get_routellm_service
+from app.services.routellm_service import is_routellm_available, get_routellm_service, get_routellm_status
 
 router = APIRouter()
 
@@ -41,6 +41,7 @@ class RoutingSettingsResponse(BaseModel):
     routellm_enabled: bool = False
     routellm_threshold: float = 0.11593
     routellm_available: bool = False  # System-level availability
+    routellm_unavailable_reason: Optional[str] = None  # Why unavailable (if unavailable)
     cascade_routing_enabled: bool = False
 
 
@@ -120,13 +121,15 @@ async def get_routing_settings(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant not found")
 
+    routellm_status = get_routellm_status()
     return RoutingSettingsResponse(
         smart_routing_enabled=tenant.smart_routing_enabled or False,
         routing_strategy=tenant.routing_strategy or "cost_optimized",
         available_strategies=ROUTING_STRATEGIES,
         routellm_enabled=getattr(tenant, 'routellm_enabled', False) or False,
         routellm_threshold=float(tenant.routellm_threshold) if getattr(tenant, 'routellm_threshold', None) else 0.11593,
-        routellm_available=is_routellm_available(),
+        routellm_available=routellm_status["available"],
+        routellm_unavailable_reason=routellm_status["reason"],
         cascade_routing_enabled=getattr(tenant, 'cascade_routing_enabled', False) or False,
     )
 
@@ -171,13 +174,15 @@ async def update_routing_settings(
     await db.commit()
     await db.refresh(tenant)
 
+    routellm_status = get_routellm_status()
     return RoutingSettingsResponse(
         smart_routing_enabled=tenant.smart_routing_enabled or False,
         routing_strategy=tenant.routing_strategy or "cost_optimized",
         available_strategies=ROUTING_STRATEGIES,
         routellm_enabled=getattr(tenant, 'routellm_enabled', False) or False,
         routellm_threshold=float(tenant.routellm_threshold) if getattr(tenant, 'routellm_threshold', None) else 0.11593,
-        routellm_available=is_routellm_available(),
+        routellm_available=routellm_status["available"],
+        routellm_unavailable_reason=routellm_status["reason"],
         cascade_routing_enabled=getattr(tenant, 'cascade_routing_enabled', False) or False,
     )
 

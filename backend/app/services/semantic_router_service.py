@@ -43,32 +43,30 @@ else:
 
 
 # Task categories with example utterances for embedding-based classification
+# Include both short phrases AND paragraph-style examples for better matching
 TASK_ROUTES = {
     "coding": [
+        # Short phrases
         "write a function that",
         "write a Python function",
-        "write a JavaScript function",
         "implement this algorithm",
         "debug this code",
         "fix this error",
-        "fix this bug",
         "refactor this class",
-        "optimize this script",
         "write unit tests for",
         "create a REST API endpoint",
-        "parse this JSON",
-        "handle this exception",
-        "write a regex pattern",
-        "implement the interface",
-        "create a database query",
         "build a component in React",
-        "write Python code to",
-        "JavaScript function that",
-        "SQL query to find",
-        "TypeScript interface for",
-        "create a function to sort",
-        "code to process",
-        "script that will",
+        # Paragraph-style prompts (more realistic)
+        "I need you to implement a middleware that handles authentication and rate limiting",
+        "Build me a service that processes data and stores it in the database",
+        "Create an API endpoint that accepts JSON and validates the input",
+        "Write a comprehensive test suite for our authentication module",
+        "Implement a caching layer using Redis for our application",
+        "I am building a SaaS application and need you to write the backend code",
+        "Please implement the following feature with proper error handling",
+        "Create a database migration script for our PostgreSQL schema",
+        "Build a webhook handler that processes incoming events",
+        "Write the code to integrate with this third-party API",
     ],
     "analysis": [
         "analyze this data",

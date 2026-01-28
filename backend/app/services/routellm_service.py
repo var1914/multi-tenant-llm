@@ -7,6 +7,10 @@ intelligent cost-quality tradeoffs with ~85% cost savings at 95% quality.
 
 RouteLLM paper: https://arxiv.org/abs/2406.18665
 
+IMPORTANT: The MF router requires OPENAI_API_KEY for text embeddings.
+The router uses OpenAI's text-embedding-3-small to embed prompts, then
+applies pre-trained MF weights for win-rate prediction.
+
 MEMORY OPTIMIZATION:
 - Set ROUTELLM_DISABLED=true to completely disable RouteLLM
 - The MF router weights (~100MB) are loaded ONLY on first prediction
@@ -23,15 +27,26 @@ logger = logging.getLogger(__name__)
 # Environment variable to disable RouteLLM entirely (saves ~100-200MB RAM)
 ROUTELLM_DISABLED = os.getenv("ROUTELLM_DISABLED", "false").lower() in ("true", "1", "yes")
 
+# Check if OPENAI_API_KEY is available (required for MF router embeddings)
+OPENAI_API_KEY_AVAILABLE = bool(os.getenv("OPENAI_API_KEY"))
+
 # RouteLLM availability flag (library importable, not necessarily loaded)
 ROUTELLM_IMPORTABLE = False
 Controller = None
 
 if not ROUTELLM_DISABLED:
+    if not OPENAI_API_KEY_AVAILABLE:
+        logger.warning(
+            "RouteLLM requires OPENAI_API_KEY for embeddings. "
+            "Set OPENAI_API_KEY environment variable to enable ML routing."
+        )
     try:
         from routellm.controller import Controller
         ROUTELLM_IMPORTABLE = True
-        logger.info("RouteLLM library available (lazy loading enabled)")
+        if OPENAI_API_KEY_AVAILABLE:
+            logger.info("RouteLLM library available (lazy loading enabled)")
+        else:
+            logger.info("RouteLLM library importable but OPENAI_API_KEY not set")
     except ImportError:
         logger.warning("routellm not installed. Install with: pip install routellm")
     except Exception as e:
@@ -113,6 +128,13 @@ class RouteLLMService:
             logger.warning("RouteLLM not available, routing will use fallback")
             return False
 
+        if not OPENAI_API_KEY_AVAILABLE:
+            logger.warning(
+                "RouteLLM MF router requires OPENAI_API_KEY for text embeddings. "
+                "Falling back to semantic-router."
+            )
+            return False
+
         try:
             logger.info("Lazy-loading RouteLLM MF router (this may take a moment)...")
             # MF router is recommended - fastest with best accuracy tradeoff
@@ -130,8 +152,8 @@ class RouteLLMService:
             return False
 
     def is_available(self) -> bool:
-        """Check if RouteLLM can be used (library importable, not necessarily loaded yet)."""
-        return ROUTELLM_IMPORTABLE and not ROUTELLM_DISABLED
+        """Check if RouteLLM can be used (library importable + API key available)."""
+        return ROUTELLM_IMPORTABLE and not ROUTELLM_DISABLED and OPENAI_API_KEY_AVAILABLE
 
     def is_loaded(self) -> bool:
         """Check if RouteLLM model is already loaded in memory."""
@@ -263,5 +285,27 @@ def get_routellm_service() -> RouteLLMService:
 
 
 def is_routellm_available() -> bool:
-    """Check if RouteLLM library is available (not necessarily loaded yet)."""
-    return ROUTELLM_IMPORTABLE and not ROUTELLM_DISABLED
+    """Check if RouteLLM is fully available (library + API key)."""
+    return ROUTELLM_IMPORTABLE and not ROUTELLM_DISABLED and OPENAI_API_KEY_AVAILABLE
+
+
+def get_routellm_status() -> Dict[str, Any]:
+    """Get detailed status of RouteLLM availability."""
+    return {
+        "available": is_routellm_available(),
+        "library_installed": ROUTELLM_IMPORTABLE,
+        "api_key_set": OPENAI_API_KEY_AVAILABLE,
+        "disabled_by_env": ROUTELLM_DISABLED,
+        "reason": _get_unavailability_reason(),
+    }
+
+
+def _get_unavailability_reason() -> Optional[str]:
+    """Get reason why RouteLLM is unavailable, or None if available."""
+    if ROUTELLM_DISABLED:
+        return "Disabled via ROUTELLM_DISABLED environment variable"
+    if not ROUTELLM_IMPORTABLE:
+        return "routellm library not installed (pip install routellm)"
+    if not OPENAI_API_KEY_AVAILABLE:
+        return "OPENAI_API_KEY not set (required for text embeddings)"
+    return None
