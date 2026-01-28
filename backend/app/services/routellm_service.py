@@ -119,8 +119,18 @@ class RouteLLMService:
 
     def _ensure_controller(self) -> bool:
         """Lazy-load the controller on first use. Returns True if available."""
+        # If already loaded successfully, return True
+        if self._controller is not None:
+            return True
+
+        # If we tried before and it's still not available, check if conditions changed
         if self._load_attempted:
-            return self._controller is not None
+            # Re-check if API key is now available (e.g., env var added after startup)
+            current_api_key_status = bool(os.getenv("OPENAI_API_KEY"))
+            if not current_api_key_status:
+                return False
+            # API key is now available but wasn't before - allow retry
+            logger.info("OPENAI_API_KEY now available, retrying RouteLLM initialization...")
 
         self._load_attempted = True
 
@@ -128,7 +138,8 @@ class RouteLLMService:
             logger.warning("RouteLLM not available, routing will use fallback")
             return False
 
-        if not OPENAI_API_KEY_AVAILABLE:
+        # Re-check API key at runtime (not just at import time)
+        if not os.getenv("OPENAI_API_KEY"):
             logger.warning(
                 "RouteLLM MF router requires OPENAI_API_KEY for text embeddings. "
                 "Falling back to semantic-router."
@@ -291,11 +302,15 @@ def is_routellm_available() -> bool:
 
 def get_routellm_status() -> Dict[str, Any]:
     """Get detailed status of RouteLLM availability."""
+    service = get_routellm_service()
     return {
         "available": is_routellm_available(),
         "library_installed": ROUTELLM_IMPORTABLE,
         "api_key_set": OPENAI_API_KEY_AVAILABLE,
+        "api_key_set_runtime": bool(os.getenv("OPENAI_API_KEY")),  # Check at runtime
         "disabled_by_env": ROUTELLM_DISABLED,
+        "controller_loaded": service._controller is not None,
+        "load_attempted": service._load_attempted,
         "reason": _get_unavailability_reason(),
     }
 
