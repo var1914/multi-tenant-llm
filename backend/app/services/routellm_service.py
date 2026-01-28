@@ -218,20 +218,27 @@ class RouteLLMService:
             return 0.5, False
 
         try:
-            # Format messages for RouteLLM
+            # Format messages for RouteLLM - extract as single string prompt
             prompt = self._format_messages(messages)
 
-            # Get prediction from MF router
-            # The router internally calls calculate_strong_win_rate
-            router = self._controller.routers["mf"]
-            score = router.calculate_strong_win_rate(
-                [{"role": "user", "content": prompt}]
-            )
+            # Debug: Log the prompt being sent
+            logger.debug(f"RouteLLM input prompt length: {len(prompt)}, preview: {prompt[:200] if prompt else 'EMPTY'}")
 
+            if not prompt or not prompt.strip():
+                logger.warning("RouteLLM received empty prompt, skipping prediction")
+                return 0.5, False
+
+            # Get prediction from MF router
+            # IMPORTANT: MF router's calculate_strong_win_rate expects a STRING prompt,
+            # not a list of message dicts. It internally calls OpenAI embeddings with input=[prompt]
+            router = self._controller.routers["mf"]
+            score = router.calculate_strong_win_rate(prompt)
+
+            logger.info(f"RouteLLM prediction successful: score={score:.4f}")
             return float(score), True
 
         except Exception as e:
-            logger.warning(f"RouteLLM prediction failed: {e}")
+            logger.warning(f"RouteLLM prediction failed: {e}", exc_info=True)
             return 0.5, False
 
     def route(
