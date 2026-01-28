@@ -46,9 +46,12 @@ else:
 TASK_ROUTES = {
     "coding": [
         "write a function that",
+        "write a Python function",
+        "write a JavaScript function",
         "implement this algorithm",
         "debug this code",
         "fix this error",
+        "fix this bug",
         "refactor this class",
         "optimize this script",
         "write unit tests for",
@@ -63,6 +66,9 @@ TASK_ROUTES = {
         "JavaScript function that",
         "SQL query to find",
         "TypeScript interface for",
+        "create a function to sort",
+        "code to process",
+        "script that will",
     ],
     "analysis": [
         "analyze this data",
@@ -241,8 +247,11 @@ class SemanticTaskClassifier:
             self._router = SemanticRouter(
                 encoder=encoder,
                 routes=routes,
+                auto_sync='local',  # Auto-sync routes to local index
             )
-            logger.info("Semantic router initialized successfully")
+            # Lower threshold for better recall (default is 0.5)
+            self._router.set_threshold(threshold=0.3)
+            logger.info("Semantic router initialized with local index (threshold=0.3)")
             return True
 
         except Exception as e:
