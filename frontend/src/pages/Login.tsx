@@ -102,6 +102,12 @@ export default function Login() {
               </div>
             </div>
 
+            {mutation.isError && (
+              <div role="alert" className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                {(mutation.error as Error & { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Login failed. Please check your credentials and try again.'}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={mutation.isPending}

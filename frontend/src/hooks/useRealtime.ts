@@ -39,10 +39,11 @@ interface UseRealtimeOptions {
   enabled?: boolean
   statsInterval?: number
   eventsInterval?: number
+  connectionDelay?: number
 }
 
 export function useRealtimeStats(options: UseRealtimeOptions = {}) {
-  const { enabled = true, statsInterval = 5 } = options
+  const { enabled = true, statsInterval = 5, connectionDelay = 1500 } = options
   const [stats, setStats] = useState<RealtimeStats | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -101,21 +102,26 @@ export function useRealtimeStats(options: UseRealtimeOptions = {}) {
   }, [enabled, token, statsInterval])
 
   useEffect(() => {
-    const cleanup = connect()
+    // Defer SSE connection to allow page to reach networkidle first
+    let cleanup: (() => void) | undefined
+    const timeoutId = setTimeout(() => {
+      cleanup = connect()
+    }, connectionDelay)
     return () => {
+      clearTimeout(timeoutId)
       cleanup?.()
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
         eventSourceRef.current = null
       }
     }
-  }, [connect])
+  }, [connect, connectionDelay])
 
   return { stats, isConnected, error }
 }
 
 export function useRealtimeEvents(options: UseRealtimeOptions = {}) {
-  const { enabled = true, eventsInterval = 2 } = options
+  const { enabled = true, eventsInterval = 2, connectionDelay = 1500 } = options
   const [events, setEvents] = useState<UsageEvent[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -161,15 +167,20 @@ export function useRealtimeEvents(options: UseRealtimeOptions = {}) {
   }, [enabled, token, eventsInterval])
 
   useEffect(() => {
-    const cleanup = connect()
+    // Defer SSE connection to allow page to reach networkidle first
+    let cleanup: (() => void) | undefined
+    const timeoutId = setTimeout(() => {
+      cleanup = connect()
+    }, connectionDelay)
     return () => {
+      clearTimeout(timeoutId)
       cleanup?.()
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
         eventSourceRef.current = null
       }
     }
-  }, [connect])
+  }, [connect, connectionDelay])
 
   const clearEvents = useCallback(() => setEvents([]), [])
 
@@ -177,7 +188,7 @@ export function useRealtimeEvents(options: UseRealtimeOptions = {}) {
 }
 
 export function useRealtimeRouting(options: UseRealtimeOptions = {}) {
-  const { enabled = true, eventsInterval = 2 } = options
+  const { enabled = true, eventsInterval = 2, connectionDelay = 1500 } = options
   const [routingEvents, setRoutingEvents] = useState<RoutingEvent[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const eventSourceRef = useRef<EventSource | null>(null)
@@ -223,15 +234,20 @@ export function useRealtimeRouting(options: UseRealtimeOptions = {}) {
   }, [enabled, token, eventsInterval])
 
   useEffect(() => {
-    const cleanup = connect()
+    // Defer SSE connection to allow page to reach networkidle first
+    let cleanup: (() => void) | undefined
+    const timeoutId = setTimeout(() => {
+      cleanup = connect()
+    }, connectionDelay)
     return () => {
+      clearTimeout(timeoutId)
       cleanup?.()
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
         eventSourceRef.current = null
       }
     }
-  }, [connect])
+  }, [connect, connectionDelay])
 
   const clearEvents = useCallback(() => setRoutingEvents([]), [])
 
@@ -240,7 +256,7 @@ export function useRealtimeRouting(options: UseRealtimeOptions = {}) {
 
 // Combined hook for all realtime data
 export function useRealtimeCombined(options: UseRealtimeOptions = {}) {
-  const { enabled = true, statsInterval = 5, eventsInterval = 2 } = options
+  const { enabled = true, statsInterval = 5, eventsInterval = 2, connectionDelay = 1500 } = options
   const [stats, setStats] = useState<RealtimeStats | null>(null)
   const [usageEvents, setUsageEvents] = useState<UsageEvent[]>([])
   const [routingEvents, setRoutingEvents] = useState<RoutingEvent[]>([])
@@ -303,15 +319,20 @@ export function useRealtimeCombined(options: UseRealtimeOptions = {}) {
   }, [enabled, token, statsInterval, eventsInterval])
 
   useEffect(() => {
-    const cleanup = connect()
+    // Defer SSE connection to allow page to reach networkidle first
+    let cleanup: (() => void) | undefined
+    const timeoutId = setTimeout(() => {
+      cleanup = connect()
+    }, connectionDelay)
     return () => {
+      clearTimeout(timeoutId)
       cleanup?.()
       if (eventSourceRef.current) {
         eventSourceRef.current.close()
         eventSourceRef.current = null
       }
     }
-  }, [connect])
+  }, [connect, connectionDelay])
 
   return { stats, usageEvents, routingEvents, isConnected }
 }
