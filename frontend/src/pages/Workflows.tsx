@@ -125,14 +125,6 @@ export default function Workflows() {
     return `${Math.round(seconds / 3600)}h ${Math.round((seconds % 3600) / 60)}m`
   }
 
-  if (analyticsLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -165,8 +157,18 @@ export default function Workflows() {
         </nav>
       </div>
 
+      {/* Loading State */}
+      {analyticsLoading && (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3"></div>
+            <p className="text-gray-500 text-sm">Loading workflow data...</p>
+          </div>
+        </div>
+      )}
+
       {/* Overview Tab */}
-      {selectedTab === 'overview' && analytics && (
+      {selectedTab === 'overview' && !analyticsLoading && analytics && (
         <div className="space-y-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -306,8 +308,8 @@ export default function Workflows() {
 
           {/* Workflow Detail Modal */}
           {selectedWorkflow && workflowDetail && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-xl font-bold">
@@ -498,7 +500,7 @@ export default function Workflows() {
       )}
 
       {/* Agents Tab */}
-      {selectedTab === 'agents' && analytics && (
+      {selectedTab === 'agents' && !analyticsLoading && analytics && (
         <div className="space-y-6">
           <div className="card p-6">
             <h2 className="text-lg font-semibold mb-4">Agent Performance</h2>

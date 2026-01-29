@@ -10,7 +10,7 @@ export default function ApiKeys() {
   const [newKey, setNewKey] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
-    environment: 'production',
+    environment: 'live',
   })
 
   const { data: apiKeys, isLoading } = useQuery({
@@ -23,13 +23,16 @@ export default function ApiKeys() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const response = await apiClient.post('/api-keys', data)
+      const response = await apiClient.post('/api-keys', {
+        ...data,
+        environment: data.environment === 'live' ? 'production' : data.environment,
+      })
       return response.data
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['api-keys'] })
       setNewKey(data.key)
-      setFormData({ name: '', environment: 'production' })
+      setFormData({ name: '', environment: 'live' })
     },
     onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
       toast.error(error.response?.data?.detail || 'Failed to create API key')
@@ -148,8 +151,8 @@ export default function ApiKeys() {
 
       {/* Create Modal */}
       {showModal && !newKey && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-semibold mb-4">Create API Key</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -169,7 +172,7 @@ export default function ApiKeys() {
                   value={formData.environment}
                   onChange={(e) => setFormData({ ...formData, environment: e.target.value })}
                 >
-                  <option value="production">Live</option>
+                  <option value="live">Live</option>
                   <option value="test">Test</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
