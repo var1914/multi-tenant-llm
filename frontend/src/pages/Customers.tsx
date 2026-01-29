@@ -181,6 +181,7 @@ export default function Customers() {
             No customers yet. Create your first customer to get started.
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -319,6 +320,7 @@ export default function Customers() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.schemas.auth import UserRegister, UserLogin, UserResponse
@@ -11,6 +13,16 @@ from app.config import settings
 router = APIRouter()
 
 
+def _user_response(user: User, tenant=None) -> dict:
+    """Build UserResponse dict with tenant fields merged in."""
+    resp = UserResponse.model_validate(user).model_dump()
+    t = tenant or getattr(user, "tenant", None)
+    if t:
+        resp["trial_credits_usd"] = t.trial_credits_usd
+        resp["company_name"] = t.company_name
+    return resp
+
+
 @router.post("/register", response_model=dict)
 async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
     """Register a new user and create their tenant."""
@@ -18,7 +30,7 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
     try:
         user, tenant, token = await service.register(data)
         return {
-            "user": UserResponse.model_validate(user),
+            "user": _user_response(user, tenant),
             "access_token": token,
             "token_type": "bearer",
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
@@ -34,7 +46,7 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     try:
         user, token = await service.login(data)
         return {
-            "user": UserResponse.model_validate(user),
+            "user": _user_response(user),
             "access_token": token,
             "token_type": "bearer",
             "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
@@ -43,7 +55,14 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
 
-@router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
-    """Get current authenticated user."""
-    return current_user
+@router.get("/me")
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get current authenticated user with tenant info."""
+    result = await db.execute(
+        select(User).options(selectinload(User.tenant)).where(User.id == current_user.id)
+    )
+    user = result.scalar_one()
+    return _user_response(user)

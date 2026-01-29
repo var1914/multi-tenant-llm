@@ -184,6 +184,12 @@ export default function Register() {
                   />
                 </div>
 
+                {mutation.isError && (
+                  <div role="alert" className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+                    {(mutation.error as Error & { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Registration failed. Please try again.'}
+                  </div>
+                )}
+
                 <button
                   type="submit"
                   disabled={mutation.isPending}

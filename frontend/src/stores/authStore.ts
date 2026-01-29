@@ -31,7 +31,12 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'usageflow-auth',
       onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true)
+        if (state) {
+          state.setHasHydrated(true)
+        } else {
+          // Fallback: directly set state if callback state is undefined (e.g. rehydration error)
+          useAuthStore.setState({ _hasHydrated: true })
+        }
       },
     }
   )

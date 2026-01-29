@@ -18,11 +18,18 @@ depends_on = None
 
 
 def upgrade():
-    # Create enum type for trial request status
-    trial_status_enum = postgresql.ENUM('pending', 'approved', 'rejected', name='trialrequeststatus')
-    trial_status_enum.create(op.get_bind(), checkfirst=True)
+    # Create enum type for trial request status (skip if already exists)
+    bind = op.get_bind()
+    bind.execute(sa.text(
+        "DO $$ BEGIN "
+        "CREATE TYPE trialrequeststatus AS ENUM ('pending', 'approved', 'rejected'); "
+        "EXCEPTION WHEN duplicate_object THEN NULL; "
+        "END $$;"
+    ))
 
     # Create trial_requests table
+    # Use postgresql.ENUM with create_type=False since we already created it above
+    status_enum = postgresql.ENUM('pending', 'approved', 'rejected', name='trialrequeststatus', create_type=False)
     op.create_table(
         'trial_requests',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
@@ -30,7 +37,7 @@ def upgrade():
         sa.Column('full_name', sa.String(255), nullable=False),
         sa.Column('company_name', sa.String(255), nullable=True),
         sa.Column('use_case', sa.Text(), nullable=False),
-        sa.Column('status', trial_status_enum, nullable=False, server_default='pending'),
+        sa.Column('status', status_enum, nullable=False, server_default='pending'),
         sa.Column('admin_notes', sa.Text(), nullable=True),
         sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),

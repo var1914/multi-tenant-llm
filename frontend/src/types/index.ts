@@ -4,6 +4,8 @@ export interface User {
   full_name: string | null
   role: string
   tenant_id: string
+  trial_credits_usd: number | null
+  company_name: string | null
 }
 
 export interface Tenant {

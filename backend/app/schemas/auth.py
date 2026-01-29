@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
+from decimal import Decimal
 from uuid import UUID
 
 
@@ -34,6 +35,8 @@ class UserResponse(BaseModel):
     full_name: Optional[str]
     role: str
     tenant_id: UUID
+    trial_credits_usd: Optional[Decimal] = None
+    company_name: Optional[str] = None
 
     class Config:
         from_attributes = True

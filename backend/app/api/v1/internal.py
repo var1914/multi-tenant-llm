@@ -178,6 +178,14 @@ async def track_litellm_usage(
         service = UsageService(db)
         result = await service.track_event(tenant_id, usage_data)
 
+        # Deduct cost from tenant trial credits if available
+        if tenant and tenant.trial_credits_usd and tenant.trial_credits_usd > 0:
+            tenant.trial_credits_usd = max(
+                Decimal("0"),
+                tenant.trial_credits_usd - event.cost_usd,
+            )
+            await db.commit()
+
         return LiteLLMUsageResponse(
             success=True,
             event_id=str(result.event_id)
@@ -221,11 +229,36 @@ async def check_customer_budget(
     """
     Check if a customer can make a request based on their budget limit.
     Called by LiteLLM callback before processing the request.
+
+    Checks two levels:
+    1. Tenant-level: must have credits (trial_credits_usd > 0) or active subscription
+    2. Customer-level: per-customer monthly budget (if configured)
     """
     try:
         from app.services.customer_service import CustomerService
 
         tenant_id = UUID(request.tenant_id)
+
+        # --- Tenant-level credit gate ---
+        tenant_result = await db.execute(
+            select(Tenant).where(Tenant.id == tenant_id)
+        )
+        tenant = tenant_result.scalar_one_or_none()
+
+        if tenant:
+            has_credits = tenant.trial_credits_usd is not None and tenant.trial_credits_usd > 0
+            has_subscription = tenant.subscription_status in ("active", "trialing")
+
+            if not has_credits and not has_subscription:
+                return BudgetCheckResponse(
+                    allowed=False,
+                    blocked=True,
+                    reason="No credits available. Please purchase credits to start making API calls.",
+                    current_spend_usd=None,
+                    budget_limit_usd=tenant.trial_credits_usd,
+                )
+
+        # --- Customer-level budget check ---
         customer_service = CustomerService(db)
 
         should_block, reason = await customer_service.check_budget_limit(
