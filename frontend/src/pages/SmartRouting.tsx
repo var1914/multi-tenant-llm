@@ -460,6 +460,7 @@ export default function SmartRouting() {
   const [testPrompt, setTestPrompt] = useState('')
   const [testModel, setTestModel] = useState('gpt-4o')
   const [showPlayground, setShowPlayground] = useState(true)
+  const [localThreshold, setLocalThreshold] = useState<number | null>(null)
 
   // Fetch settings
   const { data: settings, isLoading: settingsLoading } = useQuery<RoutingSettings>({
@@ -647,22 +648,53 @@ export default function SmartRouting() {
                 <div className="space-y-4 pl-4 border-l-2 border-purple-200">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Win-Rate Threshold: {(settings.routellm_threshold * 100).toFixed(1)}%
+                      Win-Rate Threshold: {((localThreshold ?? settings.routellm_threshold) * 100).toFixed(1)}%
                     </label>
                     <input
                       type="range"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      value={settings.routellm_threshold}
-                      onChange={(e) => updateSettingsMutation.mutate({
-                        routellm_threshold: parseFloat(e.target.value)
-                      } as Partial<RoutingSettings>)}
+                      min="0.01"
+                      max="0.50"
+                      step="0.005"
+                      value={localThreshold ?? settings.routellm_threshold}
+                      onChange={(e) => setLocalThreshold(parseFloat(e.target.value))}
+                      onPointerUp={() => {
+                        if (localThreshold !== null) {
+                          updateSettingsMutation.mutate({
+                            routellm_threshold: localThreshold
+                          } as Partial<RoutingSettings>)
+                          setLocalThreshold(null)
+                        }
+                      }}
                       className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
                     />
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
                       <span>More savings (route aggressively)</span>
                       <span>Higher quality (route conservatively)</span>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      {[
+                        { label: 'Default (11.6%)', value: 0.116 },
+                        { label: 'Balanced (20%)', value: 0.20 },
+                        { label: 'Quality (30%)', value: 0.30 },
+                      ].map((preset) => (
+                        <button
+                          key={preset.value}
+                          onClick={() => {
+                            setLocalThreshold(null)
+                            updateSettingsMutation.mutate({
+                              routellm_threshold: preset.value
+                            } as Partial<RoutingSettings>)
+                          }}
+                          className={clsx(
+                            'px-2.5 py-1 text-xs rounded-full border transition-colors',
+                            Math.abs(settings.routellm_threshold - preset.value) < 0.005
+                              ? 'bg-purple-100 border-purple-300 text-purple-700 font-medium'
+                              : 'bg-white border-gray-300 text-gray-600 hover:border-purple-300 hover:text-purple-600'
+                          )}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <p className="text-xs text-gray-500">
