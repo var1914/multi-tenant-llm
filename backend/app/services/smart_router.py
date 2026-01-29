@@ -13,6 +13,7 @@ No keyword-based heuristics - ML models provide better accuracy for modern users
 
 import re
 import logging
+import uuid as uuid_mod
 from typing import Optional, Tuple, List, Dict, Any
 from decimal import Decimal
 from uuid import UUID
@@ -20,6 +21,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.routing_decision import RoutingDecision
+from app.models.usage_event import UsageEvent
 from app.models.tenant import Tenant
 from app.services.semantic_router_service import (
     get_semantic_classifier,
@@ -31,6 +33,9 @@ from app.services.routellm_service import (
     get_routellm_status,
     DEFAULT_THRESHOLD as ROUTELLM_DEFAULT_THRESHOLD,
 )
+
+# text-embedding-3-small pricing: $0.02 per 1M input tokens
+EMBEDDING_COST_PER_TOKEN = Decimal("0.00000002")  # $0.02 / 1_000_000
 
 logger = logging.getLogger(__name__)
 
@@ -317,6 +322,50 @@ class SmartRouter:
         savings = original_total - routed_total
         return Decimal(str(max(0, savings)))
 
+    async def track_embedding_usage(
+        self,
+        tenant_id: UUID,
+        end_customer_id: Optional[UUID],
+        prompt_text: str,
+        request_id: Optional[str] = None,
+    ) -> None:
+        """Track token usage for RouteLLM's text-embedding-3-small call.
+
+        RouteLLM uses OpenAI embeddings internally (bypassing LiteLLM), so
+        we record the estimated cost as a separate usage event.
+        """
+        try:
+            # Estimate tokens: ~4 chars per token for English text
+            estimated_tokens = max(1, len(prompt_text) // 4)
+            estimated_cost = EMBEDDING_COST_PER_TOKEN * estimated_tokens
+
+            idempotency_key = f"routellm_embed_{request_id or uuid_mod.uuid4().hex}"
+
+            event = UsageEvent(
+                tenant_id=tenant_id,
+                end_customer_id=end_customer_id,
+                event_timestamp=datetime.utcnow(),
+                event_type="routing_embedding",
+                model="text-embedding-3-small",
+                provider="openai",
+                quantity=estimated_tokens,
+                cost_usd=estimated_cost,
+                event_metadata={
+                    "source": "routellm",
+                    "prompt_chars": len(prompt_text),
+                    "estimated_tokens": estimated_tokens,
+                },
+                idempotency_key=idempotency_key,
+            )
+            self.db.add(event)
+            await self.db.flush()
+            logger.debug(
+                f"Tracked RouteLLM embedding usage: ~{estimated_tokens} tokens, "
+                f"${estimated_cost:.6f}"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to track embedding usage: {e}")
+
     async def route_request(
         self,
         tenant_id: UUID,
@@ -526,6 +575,15 @@ class SmartRouter:
                         result["routellm_used"] = True
                         result["routellm_win_rate"] = routellm_decision["strong_win_rate"]
                         result["routellm_confident"] = routellm_decision["is_confident"]
+
+                        # Track embedding token usage (RouteLLM calls OpenAI embeddings)
+                        prompt_text = routellm_service._format_messages(messages)
+                        await self.track_embedding_usage(
+                            tenant_id=tenant_id,
+                            end_customer_id=end_customer_id,
+                            prompt_text=prompt_text,
+                            request_id=request_id,
+                        )
                 except Exception as e:
                     logger.warning(f"RouteLLM routing failed: {e}")
             else:

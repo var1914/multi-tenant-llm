@@ -53,12 +53,9 @@ export function useRealtimeStats(options: UseRealtimeOptions = {}) {
     if (!enabled || !token) return
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const url = `${apiUrl}/api/v1/realtime/stats?interval=${statsInterval}`
+    const url = `${apiUrl}/api/v1/realtime/stats?interval=${statsInterval}&token=${encodeURIComponent(token)}`
 
-    // EventSource doesn't support custom headers, so we use a workaround
-    // by passing the token as a query parameter (the backend needs to handle this)
-    // For now, we'll assume the user is already authenticated via cookies/session
-    const eventSource = new EventSource(url, { withCredentials: true })
+    const eventSource = new EventSource(url)
 
     eventSource.addEventListener('stats', (event) => {
       try {
@@ -128,9 +125,9 @@ export function useRealtimeEvents(options: UseRealtimeOptions = {}) {
     if (!enabled || !token) return
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const url = `${apiUrl}/api/v1/realtime/events?interval=${eventsInterval}`
+    const url = `${apiUrl}/api/v1/realtime/events?interval=${eventsInterval}&token=${encodeURIComponent(token)}`
 
-    const eventSource = new EventSource(url, { withCredentials: true })
+    const eventSource = new EventSource(url)
 
     eventSource.addEventListener('usage', (event) => {
       try {
@@ -190,9 +187,9 @@ export function useRealtimeRouting(options: UseRealtimeOptions = {}) {
     if (!enabled || !token) return
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const url = `${apiUrl}/api/v1/realtime/routing?interval=${eventsInterval}`
+    const url = `${apiUrl}/api/v1/realtime/routing?interval=${eventsInterval}&token=${encodeURIComponent(token)}`
 
-    const eventSource = new EventSource(url, { withCredentials: true })
+    const eventSource = new EventSource(url)
 
     eventSource.addEventListener('routing', (event) => {
       try {
@@ -255,9 +252,9 @@ export function useRealtimeCombined(options: UseRealtimeOptions = {}) {
     if (!enabled || !token) return
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-    const url = `${apiUrl}/api/v1/realtime/combined?stats_interval=${statsInterval}&events_interval=${eventsInterval}`
+    const url = `${apiUrl}/api/v1/realtime/combined?stats_interval=${statsInterval}&events_interval=${eventsInterval}&token=${encodeURIComponent(token)}`
 
-    const eventSource = new EventSource(url, { withCredentials: true })
+    const eventSource = new EventSource(url)
 
     eventSource.addEventListener('stats', (event) => {
       try {

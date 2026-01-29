@@ -157,10 +157,11 @@ test.describe('Smart Routing with AI Agentic Prompts', () => {
       return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
     });
 
-    // Enable smart routing for tests if we have a token
+    // Enable smart routing and RouteLLM for tests if we have a token
     if (authToken) {
       await updateRoutingSettings(API_BASE_URL, authToken, {
         smart_routing_enabled: true,
+        routellm_enabled: true,
       });
     }
   });
@@ -453,8 +454,8 @@ test.describe('Smart Routing with AI Agentic Prompts', () => {
         console.log(`\n${type} prompt routing reason:`);
         console.log(`  ${result!.routing_reason}`);
 
-        // Routing reason should mention ML/Semantic/Task
-        expect(result!.routing_reason).toMatch(/ML|Semantic|Task|score|threshold/i);
+        // Routing reason should mention ML/Semantic/Task/RouteLLM
+        expect(result!.routing_reason).toMatch(/ML|Semantic|Task|score|threshold|RouteLLM/i);
       }
     });
   });

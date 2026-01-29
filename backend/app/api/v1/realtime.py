@@ -21,7 +21,7 @@ from app.models.usage_event import UsageEvent
 from app.models.routing_decision import RoutingDecision
 from app.models.end_customer import EndCustomer
 from app.models.tenant import Tenant
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user_sse
 from app.models.user import User
 
 router = APIRouter()
@@ -228,7 +228,7 @@ async def generate_routing_stream(
 async def stream_stats(
     request: Request,
     interval: int = Query(5, ge=1, le=60),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sse),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -267,7 +267,7 @@ async def stream_stats(
 async def stream_events(
     request: Request,
     interval: int = Query(2, ge=1, le=30),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sse),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -296,7 +296,7 @@ async def stream_events(
 async def stream_routing(
     request: Request,
     interval: int = Query(2, ge=1, le=30),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sse),
     db: AsyncSession = Depends(get_async_session),
 ):
     """
@@ -326,7 +326,7 @@ async def stream_combined(
     request: Request,
     stats_interval: int = Query(5, ge=1, le=60),
     events_interval: int = Query(2, ge=1, le=30),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sse),
     db: AsyncSession = Depends(get_async_session),
 ):
     """

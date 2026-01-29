@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import apiClient from '../../api/client'
 
 interface DailyUsage {
@@ -46,13 +46,7 @@ export default function UsageChart() {
   return (
     <div className="h-80">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-            </linearGradient>
-          </defs>
+        <LineChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="date" stroke="#9ca3af" fontSize={12} />
           <YAxis stroke="#9ca3af" fontSize={12} tickFormatter={(v) => v.toLocaleString()} />
@@ -67,15 +61,15 @@ export default function UsageChart() {
               name === 'tokens' ? 'Tokens' : 'Cost',
             ]}
           />
-          <Area
+          <Line
             type="monotone"
             dataKey="tokens"
             stroke="#3b82f6"
-            fillOpacity={1}
-            fill="url(#colorTokens)"
+            strokeWidth={2}
+            dot={{ fill: '#3b82f6', strokeWidth: 2 }}
             name="tokens"
           />
-        </AreaChart>
+        </LineChart>
       </ResponsiveContainer>
     </div>
   )
