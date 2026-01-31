@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { authApi } from '../api/auth'
 import { useAuthStore } from '../stores/authStore'
+import { trackPageView } from '../utils/tracking'
 
 function TokenTrailLogo({ className = "w-8 h-8" }: { className?: string }) {
   return (
@@ -33,6 +35,8 @@ export default function Login() {
   const login = useAuthStore((state) => state.login)
   const [formData, setFormData] = useState({ email: '', password: '' })
 
+  useEffect(() => { trackPageView() }, [])
+
   const mutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: (data) => {
@@ -52,6 +56,11 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0b] py-12 px-4 sm:px-6 lg:px-8 relative">
+      <Helmet>
+        <title>Sign In - TokenTrail</title>
+        <meta name="description" content="Sign in to your TokenTrail account to manage LLM costs, API usage, and billing." />
+      </Helmet>
+
       {/* Subtle grid background */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(39,39,42,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(39,39,42,0.3)_1px,transparent_1px)] bg-[size:64px_64px]" />
 

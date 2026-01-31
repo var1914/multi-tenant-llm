@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
+import { Helmet } from 'react-helmet-async'
 import {
   ArrowRightIcon,
   CheckIcon,
@@ -8,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline'
 import PricingCalculator from '../components/landing/PricingCalculator'
 import TrialRequestModal from '../components/landing/TrialRequestModal'
+import { trackPageView } from '../utils/tracking'
 
 // TokenTrail Logo Component
 function TokenTrailLogo({ className = "w-8 h-8" }: { className?: string }) {
@@ -672,8 +674,15 @@ function Pricing() {
 export default function Landing() {
   const [isTrialModalOpen, setIsTrialModalOpen] = useState(false)
 
+  useEffect(() => { trackPageView() }, [])
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
+      <Helmet>
+        <title>TokenTrail - LLM Cost Tracking, Smart Routing & Multi-Tenant Billing</title>
+        <meta name="description" content="Track every LLM API call in real-time, save 30-50% with smart model routing, and bill customers based on actual usage. The multi-tenant platform for AI-powered SaaS." />
+      </Helmet>
+
       {/* Trial Request Modal */}
       <TrialRequestModal
         isOpen={isTrialModalOpen}

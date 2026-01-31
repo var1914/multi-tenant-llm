@@ -1,9 +1,10 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, tenants, customers, usage, api_keys, alerts, billing, internal, routing, realtime, predictions, workflows, outcome_billing, admin, trial
+from app.api.v1 import auth, tenants, customers, usage, api_keys, alerts, billing, internal, routing, realtime, predictions, workflows, outcome_billing, admin, trial, tracking
 
 api_router = APIRouter()
 
 api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+api_router.include_router(tracking.router, prefix="/track", tags=["Tracking"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
 api_router.include_router(trial.router, prefix="/trial", tags=["Trial Requests"])
 api_router.include_router(tenants.router, prefix="/tenants", tags=["Tenants"])

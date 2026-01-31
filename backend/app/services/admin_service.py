@@ -11,6 +11,7 @@ from app.models.tenant import Tenant
 from app.models.end_customer import EndCustomer
 from app.models.api_key import ApiKey
 from app.models.usage_event import UsageEvent
+from app.models.page_view import PageView
 
 
 class AdminService:
@@ -293,3 +294,87 @@ class AdminService:
             "role": user.role,
             "is_active": user.is_active,
         }
+
+    async def get_page_view_stats(self) -> dict:
+        """Get page view summary stats."""
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        total_views = await self.db.scalar(
+            select(func.count(PageView.id))
+        )
+        total_unique = await self.db.scalar(
+            select(func.count(func.distinct(PageView.visitor_id)))
+        )
+        today_views = await self.db.scalar(
+            select(func.count(PageView.id)).where(PageView.created_at >= today_start)
+        )
+        today_unique = await self.db.scalar(
+            select(func.count(func.distinct(PageView.visitor_id)))
+            .where(PageView.created_at >= today_start)
+        )
+
+        # Top referrers (excluding empty/null)
+        referrer_result = await self.db.execute(
+            select(
+                PageView.referrer,
+                func.count(PageView.id).label('count')
+            )
+            .where(PageView.referrer.isnot(None))
+            .where(PageView.referrer != '')
+            .group_by(PageView.referrer)
+            .order_by(func.count(PageView.id).desc())
+            .limit(10)
+        )
+        top_referrers = [
+            {"referrer": row.referrer, "count": row.count}
+            for row in referrer_result.all()
+        ]
+
+        # Top UTM sources
+        utm_result = await self.db.execute(
+            select(
+                PageView.utm_source,
+                func.count(PageView.id).label('count')
+            )
+            .where(PageView.utm_source.isnot(None))
+            .group_by(PageView.utm_source)
+            .order_by(func.count(PageView.id).desc())
+            .limit(10)
+        )
+        top_sources = [
+            {"source": row.utm_source, "count": row.count}
+            for row in utm_result.all()
+        ]
+
+        return {
+            "total_views": total_views or 0,
+            "total_unique": total_unique or 0,
+            "today_views": today_views or 0,
+            "today_unique": today_unique or 0,
+            "top_referrers": top_referrers,
+            "top_sources": top_sources,
+        }
+
+    async def get_page_views_over_time(self, days: int = 30) -> list[dict]:
+        """Get daily page view + unique visitor counts."""
+        start_date = datetime.utcnow() - timedelta(days=days)
+
+        result = await self.db.execute(
+            select(
+                func.date(PageView.created_at).label('date'),
+                func.count(PageView.id).label('views'),
+                func.count(func.distinct(PageView.visitor_id)).label('unique_visitors'),
+            )
+            .where(PageView.created_at >= start_date)
+            .group_by(func.date(PageView.created_at))
+            .order_by(func.date(PageView.created_at))
+        )
+
+        return [
+            {
+                "date": str(row.date),
+                "views": row.views,
+                "unique_visitors": row.unique_visitors,
+            }
+            for row in result.all()
+        ]

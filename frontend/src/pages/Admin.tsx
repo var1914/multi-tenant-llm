@@ -141,6 +141,24 @@ export default function Admin() {
     enabled: activeTab === 'users',
   })
 
+  // Fetch page view stats
+  const { data: pageViewStats } = useQuery({
+    queryKey: ['admin-page-views'],
+    queryFn: async () => {
+      const response = await apiClient.get('/admin/page-views')
+      return response.data
+    },
+  })
+
+  // Fetch page views over time
+  const { data: pageViewsOverTime } = useQuery({
+    queryKey: ['admin-page-views-over-time'],
+    queryFn: async () => {
+      const response = await apiClient.get('/admin/page-views/over-time?days=30')
+      return response.data
+    },
+  })
+
   // Fetch trial stats
   const { data: trialStats } = useQuery<TrialStats>({
     queryKey: ['admin-trial-stats'],
@@ -320,6 +338,83 @@ export default function Admin() {
               subtitle={`${formatNumber(stats?.usage.total_events || 0)} events`}
               color="emerald"
             />
+          </div>
+
+          {/* Page View Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              title="Views Today"
+              value={pageViewStats?.today_views || 0}
+              subtitle={`${pageViewStats?.today_unique || 0} unique`}
+              color="cyan"
+            />
+            <StatCard
+              title="Total Views"
+              value={formatNumber(pageViewStats?.total_views || 0)}
+              subtitle={`${formatNumber(pageViewStats?.total_unique || 0)} unique`}
+              color="blue"
+            />
+          </div>
+
+          {/* Page Views Chart & Top Referrers */}
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Page Views (30 days)</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={pageViewsOverTime || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="date"
+                      stroke="#9ca3af"
+                      fontSize={12}
+                      tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    />
+                    <YAxis stroke="#9ca3af" fontSize={12} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Bar dataKey="views" fill="#06b6d4" radius={[4, 4, 0, 0]} name="Views" />
+                    <Bar dataKey="unique_visitors" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Unique" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Referrers</h3>
+              <div className="space-y-3">
+                {(pageViewStats?.top_referrers || []).slice(0, 8).map((ref: { referrer: string; count: number }, i: number) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-6 h-6 rounded-full bg-cyan-100 text-cyan-600 flex items-center justify-center text-xs font-medium flex-shrink-0">
+                        {i + 1}
+                      </span>
+                      <span className="text-sm text-gray-900 truncate">{ref.referrer || 'Direct'}</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-600 ml-4">{ref.count}</span>
+                  </div>
+                ))}
+                {(pageViewStats?.top_sources || []).length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="text-xs font-medium text-gray-500 uppercase mb-3">UTM Sources</h4>
+                    {(pageViewStats?.top_sources || []).slice(0, 5).map((src: { utm_source: string; count: number }, i: number) => (
+                      <div key={i} className="flex items-center justify-between py-1">
+                        <span className="text-sm text-gray-700">{src.utm_source}</span>
+                        <span className="text-sm font-medium text-gray-600">{src.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {(!pageViewStats?.top_referrers || pageViewStats.top_referrers.length === 0) && (
+                  <p className="text-sm text-gray-500 text-center py-4">No referrer data yet</p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Charts Row */}

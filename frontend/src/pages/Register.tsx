@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { authApi } from '../api/auth'
 import { useAuthStore } from '../stores/authStore'
+import { trackPageView } from '../utils/tracking'
 
 function TokenTrailLogo({ className = "w-8 h-8" }: { className?: string }) {
   return (
@@ -45,6 +47,8 @@ export default function Register() {
     company_name: '',
   })
 
+  useEffect(() => { trackPageView() }, [])
+
   const mutation = useMutation({
     mutationFn: authApi.register,
     onSuccess: (data) => {
@@ -64,6 +68,11 @@ export default function Register() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] relative">
+      <Helmet>
+        <title>Start Free Trial - TokenTrail</title>
+        <meta name="description" content="Create your TokenTrail account and start tracking LLM costs in real-time. Free 14-day trial, no credit card required." />
+      </Helmet>
+
       {/* Subtle grid background */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(39,39,42,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(39,39,42,0.3)_1px,transparent_1px)] bg-[size:64px_64px]" />
 

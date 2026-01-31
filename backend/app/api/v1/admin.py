@@ -103,6 +103,27 @@ async def get_all_users(
     }
 
 
+@router.get("/page-views")
+async def get_page_view_stats(
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """Get page view summary statistics. Admin only."""
+    service = AdminService(db)
+    return await service.get_page_view_stats()
+
+
+@router.get("/page-views/over-time")
+async def get_page_views_over_time(
+    days: int = Query(30, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    """Get daily page view counts. Admin only."""
+    service = AdminService(db)
+    return await service.get_page_views_over_time(days)
+
+
 @router.patch("/users/{user_id}")
 async def update_user(
     user_id: UUID,
