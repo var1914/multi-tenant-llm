@@ -31,8 +31,8 @@ class ReadOnlyDemoMiddleware(BaseHTTPMiddleware):
             # JWT signature verification prevents tampering with is_demo flag
             payload = jwt.decode(
                 token,
-                settings.SECRET_KEY,
-                algorithms=[settings.ALGORITHM],
+                settings.JWT_SECRET_KEY,
+                algorithms=[settings.JWT_ALGORITHM],
             )
 
             # Check the signed is_demo claim (no database hit needed)
