@@ -25,7 +25,8 @@ def create_access_token(
     tenant_id: UUID,
     email: str,
     role: str,
-    expires_delta: Optional[timedelta] = None
+    expires_delta: Optional[timedelta] = None,
+    extra_claims: Optional[dict] = None
 ) -> str:
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -39,6 +40,10 @@ def create_access_token(
         "role": role,
         "exp": expire,
     }
+
+    # Add extra claims if provided (e.g., is_demo flag)
+    if extra_claims:
+        to_encode.update(extra_claims)
 
     return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
