@@ -4,6 +4,7 @@ import Layout from './components/common/Layout'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import DemoLogin from './pages/DemoLogin'
 import Dashboard from './pages/Dashboard'
 import Analytics from './pages/Analytics'
 import Customers from './pages/Customers'
@@ -67,6 +68,7 @@ function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/demo" element={<DemoLogin />} />
 
       {/* Protected app routes */}
       <Route

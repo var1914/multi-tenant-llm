@@ -6,6 +6,7 @@ export interface User {
   tenant_id: string
   trial_credits_usd: number | null
   company_name: string | null
+  is_demo?: boolean
 }
 
 export interface Tenant {

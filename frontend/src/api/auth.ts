@@ -28,6 +28,11 @@ export const authApi = {
     const response = await apiClient.get('/auth/me')
     return response.data
   },
+
+  demoLogin: async (): Promise<AuthResponse> => {
+    const response = await apiClient.post('/auth/demo-login')
+    return response.data
+  },
 }
 
 export default authApi

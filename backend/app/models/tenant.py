@@ -34,6 +34,9 @@ class Tenant(Base, UUIDMixin, TimestampMixin):
     # Trial credits (added when user registers with approved trial)
     trial_credits_usd = Column(Numeric(10, 2), default=0)
 
+    # Demo mode flag (for read-only demo tenant)
+    is_demo = Column(Boolean, default=False, nullable=False)
+
     # Relationships
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
     end_customers = relationship("EndCustomer", back_populates="tenant", cascade="all, delete-orphan")

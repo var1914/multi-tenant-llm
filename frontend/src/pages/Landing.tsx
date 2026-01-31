@@ -769,21 +769,21 @@ export default function Landing() {
               </p>
 
               <div className="flex flex-wrap gap-4 mb-8">
+                <Link
+                  to="/demo"
+                  className="group inline-flex items-center gap-2 px-6 py-3 bg-green-500 text-black rounded-lg font-semibold hover:bg-green-400 transition-colors"
+                >
+                  <PlayIcon className="w-4 h-4" />
+                  Try Live Demo
+                  <ArrowRightIcon className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                </Link>
                 <button
                   onClick={() => setIsTrialModalOpen(true)}
-                  className="group inline-flex items-center gap-2 px-6 py-3 bg-green-500 text-black rounded-lg font-semibold hover:bg-green-400 transition-colors"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-lg font-semibold border border-zinc-800 hover:bg-zinc-800 transition-colors"
                 >
                   <SparklesIcon className="w-4 h-4" />
                   Request $5 Trial
-                  <ArrowRightIcon className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </button>
-                <a
-                  href="#how-it-works"
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-lg font-semibold border border-zinc-800 hover:bg-zinc-800 transition-colors"
-                >
-                  <PlayIcon className="w-4 h-4" />
-                  See how it works
-                </a>
               </div>
 
               <FeatureHighlights />
