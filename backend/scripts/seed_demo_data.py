@@ -4,6 +4,7 @@ Seed script to populate UsageFlow with realistic demo data for a big organizatio
 Run from backend directory: python -m scripts.seed_demo_data
 """
 import asyncio
+import json
 import random
 import uuid
 from datetime import datetime, timedelta
@@ -184,11 +185,13 @@ async def seed_usage_events(conn, tenant_id, customer_ids):
                         event_id, tenant_id, customer_id, event_time, 'llm_completion',
                         model_name, model['provider'], total_tokens, Decimal(str(round(cost, 6))),
                         idempotency_key, datetime.utcnow(),
-                        {"input_tokens": input_tokens, "output_tokens": output_tokens}
+                        json.dumps({"input_tokens": input_tokens, "output_tokens": output_tokens})
                     )
                     event_count += 1
-                except Exception:
-                    pass  # Skip duplicates
+                except Exception as e:
+                    # Log errors for debugging (most will be duplicate key violations)
+                    if event_count == 0:  # Only print first error
+                        print(f"    Warning: {type(e).__name__}: {e}")
 
     print(f"  Created {event_count} usage events")
 
@@ -303,7 +306,7 @@ async def seed_workflows(conn, tenant_id, customer_ids):
                         random.randint(0, total_steps * 2),  # Tool calls
                         total_tokens, total_cost, budget_exceeded, budget_exceeded,
                         datetime.utcnow(),
-                        {"trigger": "api", "version": "1.0"}
+                        json.dumps({"trigger": "api", "version": "1.0"})
                     )
                     workflow_count += 1
 
@@ -346,7 +349,7 @@ async def seed_workflows(conn, tenant_id, customer_ids):
                             step_tokens, step_cost, step_status,
                             f"Successfully processed request with {agent_name}" if step_status == 'completed' else "Step failed due to timeout",
                             datetime.utcnow(),
-                            {"model": random.choice(list(MODELS.keys()))}
+                            json.dumps({"model": random.choice(list(MODELS.keys()))})
                         )
                         step_count += 1
                         step_time = step_end

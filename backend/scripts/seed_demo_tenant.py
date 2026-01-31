@@ -112,7 +112,7 @@ async def create_demo_tenant_and_user(db: AsyncSession):
             email="demo@tokentrail.com",
             hashed_password=get_password_hash("demo123"),
             full_name="Demo User",
-            role="admin",
+            role="user",  # Not admin - demo users shouldn't access admin panel
             is_active=True,
         )
         db.add(user)
