@@ -606,4 +606,511 @@ if await redis.get_demo_session_count() >= 50:
 
 ---
 
-*Last updated: January 2025*
+## BricksLLM-Inspired Features (Added: 2026-01-31)
+
+After analyzing the open-source BricksLLM project, several high-value features emerged that would significantly enhance TokenTrail's capabilities while maintaining our differentiation through smart routing and AI-powered optimization.
+
+### 21. Response Caching (HIGH PRIORITY)
+**Inspired by:** BricksLLM
+**Business Value:** ⭐⭐⭐⭐⭐ (20-40% cost savings)
+**Complexity:** Medium
+**Timeline:** Q1 2026 (4-6 weeks)
+
+**What it does:**
+Cache identical LLM requests to dramatically reduce API costs and improve latency for repeated queries.
+
+**Implementation:**
+```python
+# Cache key generation
+cache_key = hashlib.sha256(
+    f"{model}:{prompt}:{temperature}:{max_tokens}:{json.dumps(params)}".encode()
+).hexdigest()
+
+# Storage: Redis with TTL
+cached_response = await redis.get(f"llm_cache:{cache_key}")
+if cached_response:
+    return json.loads(cached_response)  # Sub-millisecond response
+
+# Cache miss: call provider and store
+response = await call_provider(...)
+await redis.setex(f"llm_cache:{cache_key}", 3600, json.dumps(response))
+```
+
+**Features:**
+- Configurable TTL per model (default: 1 hour)
+- Cache hit/miss tracking for analytics
+- Per-tenant cache size limits (e.g., 10GB)
+- Cache bypass option for time-sensitive requests
+- Admin dashboard showing cache performance
+- Automatic cache warming for common queries
+
+**Analytics:**
+```python
+# New metrics
+- cache_hit_rate: 35.2%
+- cost_saved_via_cache: $1,234.56
+- avg_cached_response_time: 15ms
+- top_cached_queries: [...]
+```
+
+**Benefits:**
+- Massive cost savings (20-40% typical)
+- Sub-millisecond responses for cached queries
+- Reduced load on LLM providers
+- Better user experience with instant responses
+- Competitive advantage (most competitors don't cache)
+
+**Differentiation from BricksLLM:**
+- Add semantic similarity caching (match similar prompts, not just exact)
+- ML-based cache invalidation (predict when cache should expire)
+- Smart cache warming based on usage patterns
+
+---
+
+### 22. Request Retry with Exponential Backoff (HIGH PRIORITY)
+**Inspired by:** BricksLLM
+**Business Value:** ⭐⭐⭐⭐ (Reliability)
+**Complexity:** Low-Medium
+**Timeline:** Q1 2026 (1-2 weeks)
+
+**What it does:**
+Automatically retry failed requests with intelligent backoff strategy, improving reliability without manual intervention.
+
+**Implementation:**
+```python
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type((RateLimitError, TimeoutError, ServiceUnavailableError))
+)
+async def call_llm_with_retry(request):
+    return await litellm.completion(...)
+```
+
+**Configuration:**
+```yaml
+retry_policy:
+  max_attempts: 3
+  backoff: exponential  # 1s, 2s, 4s, 8s
+  retry_on:
+    - 429  # Rate limit
+    - 503  # Service unavailable
+    - 504  # Gateway timeout
+    - network_error
+  dont_retry_on:
+    - 400  # Bad request (client error)
+    - 401  # Unauthorized
+    - 403  # Forbidden
+    - 422  # Validation error
+```
+
+**Features:**
+- Per-customer retry configuration
+- Track retry metrics (attempts, success rate)
+- Alert on high retry rates (indicates provider issues)
+- Configurable per-model retry policies
+- Exponential backoff with jitter (prevent thundering herd)
+
+**Benefits:**
+- Improved reliability and uptime
+- Better handling of transient provider issues
+- Reduced customer complaints
+- Automatic recovery from rate limits
+- Enterprise-grade reliability
+
+---
+
+### 23. Advanced Provider Failover (HIGH PRIORITY)
+**Inspired by:** BricksLLM
+**Business Value:** ⭐⭐⭐⭐⭐ (Reliability + Cost Optimization)
+**Complexity:** Medium-High
+**Timeline:** Q2 2026 (3-4 weeks)
+
+**What it does:**
+Smart failover to backup providers when primary fails, with cost-aware routing and circuit breaker patterns.
+
+**Implementation:**
+```python
+failover_chains = {
+    "gpt-4": [
+        {"provider": "openai", "model": "gpt-4", "priority": 1},
+        {"provider": "anthropic", "model": "claude-3.5-sonnet", "priority": 2},
+        {"provider": "openai", "model": "gpt-3.5-turbo", "priority": 3}  # Cheaper fallback
+    ],
+    "gpt-3.5": [
+        {"provider": "openai", "model": "gpt-3.5-turbo", "priority": 1},
+        {"provider": "anthropic", "model": "claude-3-haiku", "priority": 2},
+        {"provider": "deepinfra", "model": "llama-70b", "priority": 3}  # Open-source fallback
+    ]
+}
+
+# Circuit breaker
+if provider.failure_rate > 0.5:  # 50% failures
+    provider.status = "open"  # Skip for 60 seconds
+    use_next_in_chain()
+```
+
+**Features:**
+- Define failover chains per model class
+- Automatic failover on provider outages
+- Circuit breaker pattern (don't retry failing providers)
+- Health check polling for provider status
+- Cost-aware failover (prefer cheaper alternatives)
+- Track failover events and success rates
+- Alert on frequent failovers (indicates primary provider issues)
+
+**Dashboard:**
+```
+Provider Health Status:
+- OpenAI: ✅ Healthy (99.8% uptime)
+- Anthropic: ✅ Healthy (99.9% uptime)
+- Deepinfra: ⚠️ Degraded (3 failovers in last hour)
+
+Failover Events (Last 24h):
+- 12:34 PM: OpenAI → Anthropic (rate limit)
+- 3:45 PM: OpenAI → GPT-3.5 (timeout)
+```
+
+**Benefits:**
+- Near-zero downtime
+- Automatic cost optimization during outages
+- Better SLA guarantees to customers
+- Reduced manual intervention
+- Confidence for production workloads
+
+**Differentiation from BricksLLM:**
+- AI-powered failover decisions (not just rules)
+- Consider prompt complexity when failing over
+- Smart cost-quality tradeoffs
+
+---
+
+### 24. PII Detection & Masking (HIGH PRIORITY - ENTERPRISE)
+**Inspired by:** BricksLLM
+**Business Value:** ⭐⭐⭐⭐⭐ (Enterprise Compliance)
+**Complexity:** Medium
+**Timeline:** Q2 2026 (4-6 weeks)
+
+**What it does:**
+Automatically detect and mask sensitive information in requests/responses before sending to LLM providers.
+
+**Detection Types:**
+- Email addresses
+- Phone numbers (US and international)
+- Social Security Numbers (SSN)
+- Credit card numbers
+- IP addresses
+- Physical addresses
+- Names (person identification)
+- Dates of birth
+
+**Implementation Options:**
+1. **AWS Comprehend** (Recommended for enterprise)
+   - Highest accuracy
+   - Supports 12+ PII types
+   - Handles multiple languages
+   - Cost: ~$0.001 per 100 characters
+
+2. **Microsoft Presidio** (Open-source)
+   - Self-hosted
+   - Good accuracy
+   - Free but requires maintenance
+
+3. **Custom Regex + ML** (Hybrid)
+   - Fast for common patterns
+   - ML for context-aware detection
+   - Lower cost
+
+**Masking Strategies:**
+```python
+masking_strategies = {
+    "redact": "***REDACTED***",
+    "hash": "EMAIL_a3f2c1b",  # Consistent hash
+    "tokenize": "<EMAIL_TOKEN_1>",  # Reversible
+    "synthetic": "john.doe@example.com"  # Fake but realistic
+}
+```
+
+**Configuration:**
+```yaml
+pii_detection:
+  enabled: true
+  provider: aws_comprehend  # or presidio, custom
+  detect:
+    - email
+    - phone
+    - ssn
+    - credit_card
+  masking_strategy: hash
+  log_detections: true  # Audit log
+  alert_on_detection: true  # Notify customer
+```
+
+**Features:**
+- Per-tenant PII detection rules
+- Configurable masking strategies
+- Audit log of all PII detections
+- Dashboard showing PII detection metrics
+- Reverse masking for authorized users
+- Compliance reports (GDPR, HIPAA)
+
+**Benefits:**
+- GDPR/HIPAA compliance
+- Enterprise sales enabler (security requirement)
+- Reduced liability and data breach risk
+- Trust and security positioning
+- Competitive advantage
+
+---
+
+### 25. Export to External Monitoring Tools (MEDIUM PRIORITY)
+**Inspired by:** BricksLLM
+**Business Value:** ⭐⭐⭐⭐ (Enterprise Feature)
+**Complexity:** Medium
+**Timeline:** Q2 2026 (2-3 weeks)
+
+**What it does:**
+Allow customers to export metrics to their existing monitoring infrastructure.
+
+**Supported Integrations:**
+1. **Datadog** (Priority 1)
+   - Most popular enterprise monitoring
+   - Custom metrics and dashboards
+
+2. **Prometheus + Grafana** (Priority 2)
+   - Open-source standard
+   - Self-hosted option
+
+3. **New Relic** (Priority 3)
+   - Enterprise APM platform
+
+4. **AWS CloudWatch** (Priority 3)
+   - For AWS-heavy customers
+
+5. **Custom Webhooks** (Priority 4)
+   - Generic integration option
+
+**Metrics to Export:**
+```python
+metrics = {
+    "tokentrail.requests.count": 1234,
+    "tokentrail.requests.latency_ms": 850,
+    "tokentrail.requests.errors": 12,
+    "tokentrail.cost.total_usd": 45.67,
+    "tokentrail.cost.per_model.gpt4": 30.00,
+    "tokentrail.tokens.input": 50000,
+    "tokentrail.tokens.output": 25000,
+    "tokentrail.cache.hit_rate": 0.35,
+    "tokentrail.routing.decisions": 500,
+    "tokentrail.provider.health.openai": 1.0
+}
+```
+
+**Configuration:**
+```yaml
+monitoring:
+  datadog:
+    enabled: true
+    api_key: "dd_api_key_***"
+    site: "datadoghq.com"
+    tags:
+      - "env:production"
+      - "team:ai-platform"
+  prometheus:
+    enabled: true
+    endpoint: "/metrics"
+    port: 9090
+```
+
+**Benefits:**
+- Meet customers where they already monitor
+- Enterprise requirement (unified observability)
+- Better incident response
+- Integration with existing alerting
+
+---
+
+### 26. Semantic Search for Cached Responses (MEDIUM PRIORITY)
+**Business Value:** ⭐⭐⭐⭐
+**Complexity:** High
+**Timeline:** Q3 2026 (4-6 weeks)
+
+**What it does:**
+Use embeddings to find semantically similar cached responses, not just exact matches. Dramatically increases cache hit rate.
+
+**Example:**
+```
+Query 1: "What's the weather in San Francisco?"
+Query 2: "Tell me SF weather"  ← 95% similar, return cached response!
+```
+
+**Implementation:**
+```python
+# Generate embedding for prompt
+embedding = await openai.embeddings.create(
+    model="text-embedding-3-small",
+    input=prompt
+)
+
+# Search vector database
+similar = await vector_db.search(
+    vector=embedding,
+    limit=1,
+    threshold=0.95  # 95% similarity
+)
+
+if similar and similar[0].score > 0.95:
+    return similar[0].cached_response  # Semantic cache hit!
+```
+
+**Vector Database Options:**
+1. **Postgres pgvector** (Recommended)
+   - Already using Postgres
+   - Good performance for < 1M vectors
+   - No additional infrastructure
+
+2. **Pinecone**
+   - Best performance
+   - Fully managed
+   - Higher cost
+
+3. **Weaviate**
+   - Open-source
+   - Self-hosted
+   - Good balance
+
+**Benefits:**
+- 2-3x higher cache hit rate (30-50% vs 10-20%)
+- Better cost savings
+- Handle prompt variations naturally
+- Competitive differentiation
+
+**Cost:**
+- Embedding generation: $0.00002 per prompt (text-embedding-3-small)
+- Vector storage: ~$0.10/GB/month (pgvector)
+- For 100K cached prompts: ~$2-5/month
+
+---
+
+### 27. Prompt Templates & Versioning (MEDIUM PRIORITY)
+**Business Value:** ⭐⭐⭐⭐
+**Complexity:** Medium
+**Timeline:** Q3 2026 (3-4 weeks)
+
+**What it does:**
+Manage and version prompt templates for consistency and A/B testing.
+
+**Features:**
+- Template library with variable substitution
+- Version control for prompts
+- A/B test different prompt versions
+- Track which templates perform best (cost, latency, quality)
+- Rollback to previous versions
+- Share templates across team
+
+**Example Template:**
+```yaml
+template_id: customer_support_v2
+version: 2.1.0
+description: Customer support response template with context
+prompt: |
+  You are a helpful customer support agent for {company_name}.
+
+  Customer: {customer_name} (Tier: {customer_tier})
+  Question: {question}
+
+  Relevant context:
+  {context}
+
+  Provide a clear, concise answer. Be professional and friendly.
+
+variables:
+  - company_name
+  - customer_name
+  - customer_tier
+  - question
+  - context
+settings:
+  model: gpt-3.5-turbo
+  temperature: 0.7
+  max_tokens: 500
+```
+
+**API Usage:**
+```python
+response = await tokentrail.prompt_from_template(
+    template_id="customer_support_v2",
+    variables={
+        "company_name": "Acme Corp",
+        "customer_name": "John Doe",
+        "customer_tier": "Enterprise",
+        "question": "How do I export my data?",
+        "context": "..."
+    }
+)
+```
+
+**A/B Testing:**
+```python
+# Test two prompt versions
+variants = [
+    {"template": "customer_support_v2.0", "weight": 0.5},
+    {"template": "customer_support_v2.1", "weight": 0.5}
+]
+
+# Auto-analyze results
+winner = analyze_ab_test(
+    variants,
+    metrics=["cost", "latency", "user_satisfaction"]
+)
+```
+
+**Benefits:**
+- Consistent prompt quality
+- Easy experimentation
+- Version history and rollback
+- Team collaboration
+- Optimize prompts over time
+
+---
+
+## Updated Priority Matrix (Including BricksLLM Features)
+
+| Feature | Impact | Effort | Timeline | Priority |
+|---------|--------|--------|----------|----------|
+| Response Caching | Very High | Medium | Q1 2026 | ⭐⭐⭐⭐⭐ |
+| Request Retry | High | Low | Q1 2026 | ⭐⭐⭐⭐⭐ |
+| Provider Failover | Very High | High | Q2 2026 | ⭐⭐⭐⭐⭐ |
+| PII Detection | Very High | Medium | Q2 2026 | ⭐⭐⭐⭐⭐ |
+| Webhooks | High | Low | Q1 2026 | ⭐⭐⭐⭐⭐ |
+| Monitoring Export | High | Medium | Q2 2026 | ⭐⭐⭐⭐ |
+| Semantic Cache | High | High | Q3 2026 | ⭐⭐⭐⭐ |
+| Prompt Templates | High | Medium | Q3 2026 | ⭐⭐⭐⭐ |
+| Prepaid Credits | High | Medium | Q2 2026 | ⭐⭐⭐⭐ |
+| Embeddable Widget | High | Medium | Q2 2026 | ⭐⭐⭐⭐ |
+
+---
+
+## Competitive Positioning: TokenTrail vs BricksLLM
+
+**TokenTrail's Unique Value:**
+1. ✅ Smart routing (semantic + RouteLLM)
+2. ✅ AI-powered cost optimization
+3. ✅ Predictive analytics
+4. ✅ Agent workflows
+5. ✅ Full dashboard UI included
+
+**BricksLLM's Strengths (That We're Adopting):**
+1. ⏳ Response caching → Adding Q1
+2. ⏳ Request retry → Adding Q1
+3. ⏳ Provider failover → Adding Q2
+4. ⏳ PII detection → Adding Q2
+
+**Our Positioning:**
+> "TokenTrail: The smart LLM platform with AI-powered routing and enterprise security. We don't just track costs—we actively reduce them with intelligent caching, routing, and predictions."
+
+---
+
+*Last updated: January 31, 2026*
