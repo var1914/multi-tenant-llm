@@ -16,7 +16,10 @@ router = APIRouter()
 def _user_response(user: User, tenant=None) -> dict:
     """Build UserResponse dict with tenant fields merged in."""
     resp = UserResponse.model_validate(user).model_dump()
-    t = tenant or getattr(user, "tenant", None)
+    # Use provided tenant or access loaded tenant (must be eagerly loaded)
+    t = tenant
+    if not t and hasattr(user, "__dict__") and "tenant" in user.__dict__:
+        t = user.__dict__["tenant"]
     if t:
         resp["trial_credits_usd"] = t.trial_credits_usd
         resp["company_name"] = t.company_name

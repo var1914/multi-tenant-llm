@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from datetime import datetime
 from decimal import Decimal
 import re
@@ -87,7 +88,11 @@ class AuthService:
         return user, tenant, token
 
     async def login(self, data: UserLogin) -> tuple[User, str]:
-        result = await self.db.execute(select(User).where(User.email == data.email))
+        result = await self.db.execute(
+            select(User)
+            .where(User.email == data.email)
+            .options(selectinload(User.tenant))
+        )
         user = result.scalar_one_or_none()
 
         if not user or not verify_password(data.password, user.hashed_password):

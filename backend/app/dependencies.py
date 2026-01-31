@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import Optional
 from uuid import UUID
 
@@ -25,7 +26,11 @@ async def _resolve_user(token: str, db: AsyncSession) -> User:
 
     user_id = UUID(payload.get("sub"))
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(
+        select(User)
+        .where(User.id == user_id)
+        .options(selectinload(User.tenant))
+    )
     user = result.scalar_one_or_none()
 
     if user is None or not user.is_active:
