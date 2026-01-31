@@ -19,6 +19,10 @@ class ReadOnlyDemoMiddleware(BaseHTTPMiddleware):
         if request.method in ["GET", "OPTIONS", "HEAD"]:
             return await call_next(request)
 
+        # Whitelist auth endpoints (they don't have tokens yet)
+        if request.url.path in ["/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/auth/demo-login", "/api/v1/track/pageview"]:
+            return await call_next(request)
+
         # Check if request is from demo tenant
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
