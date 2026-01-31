@@ -20,8 +20,20 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       _hasHydrated: false,
-      login: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      login: (user, token) => {
+        // Clear React Query cache when switching users to prevent seeing other tenant's data
+        import('../main').then(({ queryClient }) => {
+          queryClient.clear()
+        })
+        set({ user, token, isAuthenticated: true })
+      },
+      logout: () => {
+        // Clear React Query cache on logout to prevent cached data leak
+        import('../main').then(({ queryClient }) => {
+          queryClient.clear()
+        })
+        set({ user: null, token: null, isAuthenticated: false })
+      },
       updateUser: (updates) =>
         set((state) => ({
           user: state.user ? { ...state.user, ...updates } : null,

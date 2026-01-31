@@ -7,7 +7,8 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './styles/globals.css'
 
-const queryClient = new QueryClient({
+// Export queryClient so it can be accessed from auth store for cache clearing
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes

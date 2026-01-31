@@ -1,6 +1,7 @@
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import apiClient from '../../api/client'
+import { useAuthStore } from '../../stores/authStore'
 
 interface UsageSummary {
   total_quantity: number
@@ -9,28 +10,33 @@ interface UsageSummary {
 }
 
 export default function StatsCards() {
+  const user = useAuthStore((state) => state.user)
+
   const { data: customers } = useQuery({
-    queryKey: ['customers'],
+    queryKey: ['customers', user?.tenant_id],
     queryFn: async () => {
       const response = await apiClient.get('/customers')
       return response.data
     },
+    enabled: !!user?.tenant_id,
   })
 
   const { data: apiKeys } = useQuery({
-    queryKey: ['api-keys'],
+    queryKey: ['api-keys', user?.tenant_id],
     queryFn: async () => {
       const response = await apiClient.get('/api-keys')
       return response.data
     },
+    enabled: !!user?.tenant_id,
   })
 
   const { data: usageSummary } = useQuery<UsageSummary>({
-    queryKey: ['usage-summary'],
+    queryKey: ['usage-summary', user?.tenant_id],
     queryFn: async () => {
       const response = await apiClient.get('/usage/dashboard/summary')
       return response.data
     },
+    enabled: !!user?.tenant_id,
   })
 
   const totalCustomers = customers?.length || 0
