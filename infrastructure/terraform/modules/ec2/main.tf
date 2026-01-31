@@ -21,8 +21,27 @@ data "aws_ami" "ubuntu" {
 }
 
 # =============================================================================
-# EC2 INSTANCE (uses dynamic public IP - update Route 53 DNS when IP changes)
-# Removed Elastic IP to save ~$4/mo
+# ELASTIC IP (static public IP - survives stop/start)
+# =============================================================================
+resource "aws_eip" "main" {
+  domain = "vpc"
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-app-eip"
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_eip_association" "main" {
+  instance_id   = aws_instance.main.id
+  allocation_id = aws_eip.main.id
+}
+
+# =============================================================================
+# EC2 INSTANCE
 # =============================================================================
 resource "aws_instance" "main" {
   ami                         = data.aws_ami.ubuntu.id
@@ -78,8 +97,11 @@ resource "aws_instance" "main" {
   }
 
   lifecycle {
-    # Don't recreate on AMI updates or when stopped (public IP gets released)
-    ignore_changes = [ami, user_data, associate_public_ip_address]
+    prevent_destroy = true
+    # Never let terraform stop/restart/recreate this instance unexpectedly.
+    # instance_type changes require a stop → resize → start cycle.
+    # To change instance_type intentionally, temporarily remove it from this list.
+    ignore_changes = [ami, user_data, associate_public_ip_address, instance_type]
   }
 }
 
@@ -214,6 +236,7 @@ resource "aws_iam_role_policy" "scheduler_ec2_stop" {
 resource "aws_scheduler_schedule" "stop_ec2" {
   name        = "${var.project_name}-${var.environment}-stop-ec2-midnight-ist"
   description = "Stop EC2 instance at 12:00 AM IST daily to save costs"
+  state       = "DISABLED"  # Temporarily disabled for launch day
 
   flexible_time_window {
     mode = "OFF"

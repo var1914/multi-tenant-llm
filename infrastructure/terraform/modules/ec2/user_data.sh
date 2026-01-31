@@ -41,6 +41,11 @@ cd /opt/tokentrail
 cat > /opt/tokentrail/.env <<EOF
 DATABASE_URL=postgresql+asyncpg://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME
 SYNC_DATABASE_URL=postgresql://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME
+
+# CRITICAL: LiteLLM MUST use a separate database.
+# Prisma generates DROP TABLE for tables it doesn't own — sharing a DB causes data loss.
+LITELLM_DATABASE_URL=postgresql://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$${DB_NAME}_litellm
+
 JWT_SECRET_KEY=$JWT_SECRET
 USAGEFLOW_INTERNAL_API_KEY=$INTERNAL_API_KEY
 DOMAIN_NAME=$DOMAIN_NAME

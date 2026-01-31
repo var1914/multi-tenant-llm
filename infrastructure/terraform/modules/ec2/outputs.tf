@@ -6,13 +6,18 @@ output "instance_id" {
 }
 
 output "public_ip" {
-  description = "EC2 public IP (dynamic - may change on restart)"
-  value       = aws_instance.main.public_ip
+  description = "EC2 Elastic IP (static - survives stop/start)"
+  value       = aws_eip.main.public_ip
 }
 
 output "public_dns" {
-  description = "EC2 public DNS"
-  value       = aws_instance.main.public_dns
+  description = "EC2 public DNS (from Elastic IP)"
+  value       = aws_eip.main.public_dns
+}
+
+output "eip_allocation_id" {
+  description = "Elastic IP allocation ID"
+  value       = aws_eip.main.id
 }
 
 output "private_ip" {
